@@ -12,6 +12,7 @@
     "phaser": "^4.2.1"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.60.2",
     "vite": "^8.3.1"
   }
 }
