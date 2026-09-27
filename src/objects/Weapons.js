@@ -43,6 +43,10 @@ export default class Weapons {
     kb.on('keydown-ONE', () => this.switchTo('pickaxe'));
     kb.on('keydown-TWO', () => this.switchTo('shotgun'));
     kb.on('keydown-R', () => this.startReload());
+    // Arrow keys: attack in that direction (combine two for diagonals); a fresh press counts as a click
+    this.arrows = kb.addKeys({ left: 'LEFT', right: 'RIGHT', up: 'UP', down: 'DOWN' });
+    // (handled in update, after this frame's arrow aim is known)
+    for (const k of Object.values(this.arrows)) k.on('down', () => (this.arrowPressed = true));
     scene.input.on('wheel', (pointer, over, dx, dy) => {
       if (dy !== 0) this.cycle();
     });
@@ -118,12 +122,21 @@ export default class Weapons {
     const pointer = scene.input.activePointer;
     const aim = scene.cameras.main.getWorldPoint(pointer.x, pointer.y);
     const player = this.player;
+    const a = this.arrows;
+    const ax = (a.right.isDown ? 1 : 0) - (a.left.isDown ? 1 : 0);
+    const ay = (a.down.isDown ? 1 : 0) - (a.up.isDown ? 1 : 0);
+    const arrowAim = ax !== 0 || ay !== 0;
 
-    // Face the cursor first (that decides which side the shoulder is on), then aim from the shoulder
-    const left = aim.x < player.x;
+    // Face the aim first (that decides which side the shoulder is on), then aim from the shoulder.
+    // Held arrow keys override the mouse; straight up/down keeps the current facing.
+    const left = arrowAim ? (ax !== 0 ? ax < 0 : player.flipX) : aim.x < player.x;
     player.setFlipX(left);
     const p = this.player.shoulder();
-    this.aimAngle = Math.atan2(aim.y - p.y, aim.x - p.x);
+    this.aimAngle = arrowAim ? Math.atan2(ay, ax) : Math.atan2(aim.y - p.y, aim.x - p.x);
+    if (this.arrowPressed) {
+      this.arrowPressed = false;
+      this.onPress(time);
+    }
 
     const rot = this.aimAngle + (left ? -this.swingOffset : this.swingOffset);
     if (player.alive) {
@@ -140,7 +153,9 @@ export default class Weapons {
     this.sprite.setAlpha(player.alpha);
 
     if (this.waitForRelease && !pointer.isDown) this.waitForRelease = false;
-    if (this.player.alive && pointer.leftButtonDown() && !this.waitForRelease) {
+    const mouseHeld = pointer.leftButtonDown() && !this.waitForRelease;
+    if (!mouseHeld && !arrowAim) this.slamActive = false; // (pointerup alone misses arrow releases)
+    if (this.player.alive && (mouseHeld || arrowAim)) {
       if (this.current === 'pickaxe' && time >= this.nextSwingAt) this.swing(time); // click or hold to dig
       if (this.current === 'shotgun' && this.slamActive && !this.burst && time >= this.lastShotAt + SHOTGUN.slamDelayMs) {
         this.fire(time, true);
@@ -292,7 +307,7 @@ export default class Weapons {
     // Muzzle jammed into terrain: the blast is absorbed
     const blocked = this.scene.isSolidAt(muzzleX, muzzleY);
     if (blocked) this.scene.fx.sparks(muzzleX, muzzleY);
-    const pellets = Math.round(SHOTGUN.pellets * this.gun.pellets);
+    const pellets = this.gun.pelletCount || Math.round(SHOTGUN.pellets * this.gun.pellets);
     for (let i = 0; i < pellets && !blocked; i++) {
       const t = pellets === 1 ? 0.5 : i / (pellets - 1);
       const a = angle + (t - 0.5) * spread + Phaser.Math.FloatBetween(-0.04, 0.04);
@@ -308,7 +323,8 @@ export default class Weapons {
     this.scene.cameras.main.shake(SHOTGUN.shakeMs, SHOTGUN.shakeIntensity);
     sfx(this.scene, 'shotgunShoot');
     if (this.shells > 0) this.scene.time.delayedCall(PUMP_AFTER_SHOT_MS, () => sfx(this.scene, 'shotgunPump'));
-    this.player.shove(-Math.cos(angle) * SHOTGUN.recoil, -Math.sin(angle) * SHOTGUN.recoil, SHOTGUN.recoilMs);
+    const recoil = SHOTGUN.recoil * this.gun.recoil;
+    this.player.shove(-Math.cos(angle) * recoil, -Math.sin(angle) * recoil, SHOTGUN.recoilMs);
   }
 
   startReload() {

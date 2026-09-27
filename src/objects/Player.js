@@ -21,9 +21,8 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     this.setDepth(5);
 
     this.keys = scene.input.keyboard.addKeys({
-      left: 'LEFT', right: 'RIGHT', up: 'UP',
-      a: 'A', d: 'D', w: 'W', s: 'S', down: 'DOWN', space: 'SPACE', shift: 'SHIFT',
-    });
+      a: 'A', d: 'D', w: 'W', s: 'S', space: 'SPACE', shift: 'SHIFT',
+    }); // (the arrow keys attack; see Weapons)
 
     this.hp = PLAYER.maxHp;
     this.alive = true;
@@ -56,19 +55,18 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     const k = this.keys;
 
     // Crouch (can't stand up under a ceiling); left alone during the jump windup
-    const crouchHeld = k.shift.isDown || k.s.isDown || k.down.isDown;
+    const crouchHeld = k.shift.isDown || k.s.isDown;
     if (!this.windupUntil) {
       if (crouchHeld && !this.crouching) this.setCrouch(true);
       else if (!crouchHeld && this.crouching && this.canStand()) this.setCrouch(false);
     }
 
-    const left = k.left.isDown || k.a.isDown;
-    const right = k.right.isDown || k.d.isDown;
+    const left = k.a.isDown;
+    const right = k.d.isDown;
     const jumpJustDown =
       Phaser.Input.Keyboard.JustDown(k.space) ||
-      Phaser.Input.Keyboard.JustDown(k.up) ||
       Phaser.Input.Keyboard.JustDown(k.w);
-    const jumpHeld = k.space.isDown || k.up.isDown || k.w.isDown;
+    const jumpHeld = k.space.isDown || k.w.isDown;
 
     // Horizontal: accelerate toward the target speed (skipped briefly while being knocked back)
     if (time >= this.knockUntil) {

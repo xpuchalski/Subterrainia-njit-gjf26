@@ -60,7 +60,7 @@ export default class GameScene extends Phaser.Scene {
     this.physics.add.overlap(this.weapons.pellets, this.enemies, (a, b) => {
       const [pellet, enemy] = a instanceof Enemy ? [b, a] : [a, b];
       if (!pellet.active) return;
-      enemy.hit(SHOTGUN.pelletDamage, pellet.x - pellet.body.velocity.x);
+      enemy.hit(SHOTGUN.pelletDamage * this.weapons.gun.damage, pellet.x - pellet.body.velocity.x);
       pellet.destroy();
     });
 

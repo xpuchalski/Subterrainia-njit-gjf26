@@ -246,6 +246,7 @@ export const EQUIPPED_KEY = 'dont-dig-straight-down.equipped';
 export const UNLOCKS = [
   { stat: 'kills', need: 100, weapon: 'shotgun', skin: 'shotgun_gold', label: 'Gold shotgun' },
   { stat: 'bosses', need: 10, weapon: 'shotgun', skin: 'shotgun_pink', label: 'Pink shotgun' },
+  { needs: { kills: 10, bosses: 1 }, weapon: 'shotgun', skin: 'shotgun_red', label: 'Red shotgun' }, // several stats: all required
   { stat: 'shells', need: 100, weapon: 'pickaxe', skin: 'pickaxe_coral', label: 'Coral pickaxe' },
   { stat: 'deepest', need: 15, weapon: 'pickaxe', skin: 'pickaxe_red', label: 'Red pickaxe' },
   { stat: 'deepest', need: 25, weapon: 'pickaxe', skin: 'pickaxe_gold', label: 'Gold pickaxe' },
@@ -254,7 +255,8 @@ export const UNLOCKS = [
   { stat: 'konami', need: 1, weapon: 'pickaxe', skin: 'pickaxe_bw', label: 'B&W pickaxe' }, // title screen: up up down down left right left right B A
 ];
 // What each skin does. Pickaxe: damage / speed (swing rate) / range multipliers, points = multiplier
-// on all points earned. Shotgun: pellets / shells multipliers, fullMag = one click dumps the tube.
+// on all points earned. Shotgun: pellets / shells / damage / recoil multipliers, pelletCount = exact
+// pellets per shot (overrides pellets), fullMag = one click dumps the tube.
 export const SKIN_STATS = {
   pickaxe_red: { damage: 1.5 },
   pickaxe_mint: { range: 1.4 },
@@ -264,6 +266,7 @@ export const SKIN_STATS = {
   pickaxe_bw: { points: 10, damage: 5, speed: 5, range: 3 },
   shotgun_gold: { pellets: 3 },
   shotgun_pink: { shells: 2, fullMag: true },
+  shotgun_red: { pelletCount: 1, recoil: 5, damage: 20 }, // one slug
 };
 export const FULL_MAG_DELAY_MS = 90; // time between shots when a full-mag burst dumps the tube
 // Easter egg: a mint orb buried somewhere on this layer; digging it out unlocks the mint pickaxe

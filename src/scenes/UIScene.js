@@ -37,7 +37,7 @@ export default class UIScene extends Phaser.Scene {
     });
 
     this.add.text(width - 12, height - 12,
-      'A/D · move | Space/W · jump | S/Shift · crouch | Click · use | R · reload | 1/2/scroll wheel · swap | Esc · pause',
+      'A/D · move | Space/W · jump | S/Shift · crouch | Click/Arrows · use | R · reload | 1/2/scroll wheel · swap | Esc · pause',
       { ...FONT, fontSize: '11px', color: '#dddddd', strokeThickness: 2 }
     ).setOrigin(1, 1).setAlpha(0.7);
 

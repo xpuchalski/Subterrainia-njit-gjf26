@@ -5,7 +5,9 @@ import { loadJSON, saveJSON } from './storage.js';
 export const loadStats = () => ({ kills: 0, shells: 0, deepest: 0, bosses: 0, playMs: 0, mintOrb: 0, konami: 0, ...loadJSON(STATS_KEY, {}) });
 export const saveStats = (stats) => saveJSON(STATS_KEY, stats);
 
-export const isUnlocked = (unlock, stats) => stats[unlock.stat] >= unlock.need;
+// An unlock needs either one stat ({ stat, need }) or several at once ({ needs: { stat: amount, ... } })
+export const isUnlocked = (unlock, stats) =>
+  Object.entries(unlock.needs ?? { [unlock.stat]: unlock.need }).every(([stat, need]) => (stats[stat] ?? 0) >= need);
 
 // The equipped skin per weapon: { pickaxe: skinKey | null, shotgun: ... } (null = plain weapon).
 // A weapon with no saved choice uses its most recently listed earned skin.
@@ -22,5 +24,5 @@ export function skinFor(weapon, stats, equipped = loadEquipped()) {
 
 // Stat modifiers for a skin (1 / false when it has none)
 export function skinStats(skin) {
-  return { damage: 1, speed: 1, range: 1, points: 1, pellets: 1, shells: 1, fullMag: false, ...SKIN_STATS[skin] };
+  return { damage: 1, speed: 1, range: 1, points: 1, pellets: 1, pelletCount: 0, shells: 1, recoil: 1, fullMag: false, ...SKIN_STATS[skin] };
 }

@@ -220,6 +220,7 @@ export default class PreloadScene extends Phaser.Scene {
     shotgun('shotgun', 0x6b3f1f, 0x2e2e33);
     shotgun('shotgun_gold', 0xd4a017, 0x2e2e33);
     shotgun('shotgun_pink', 0xff69b4, 0xebe5e0);
+    shotgun('shotgun_red', 0x51212b, 0x2e2e33);
     make('pellet', 4, 4, (gr) => gr.fillStyle(0xffe082).fillRect(0, 0, 4, 4));
     make('flash', 16, 16, (gr) => gr.fillStyle(0xfff3b0).fillCircle(8, 8, 8));
 
