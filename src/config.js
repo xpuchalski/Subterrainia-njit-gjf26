@@ -180,7 +180,7 @@ export const ENEMY = {
     zoom: 1.5, // camera zooms out to this while a boss is alive on the layer
     contactDamage: 2,
     jumpVelocity: -500, // clears a 4-tile wall
-    chargeBreaks: 3, // blocks a charge can smash through in front of it (never below)
+    chargeBreaks: 5, // blocks a charge can smash in front of it, including the ground row ahead
     knockbackMult: 0.15, // barely budges when hit
     telegraphMs: 1000, // flashes this long before each attack
     attackRange: 420, // starts an attack when the player is this close (and roughly level)
@@ -190,7 +190,9 @@ export const ENEMY = {
     boulderSpeed: 380, // thrower boss: rips up a block and throws a boulder
     boulderScale: 3,
     boulderDamage: 2,
-    boulderBreaks: 2, // tiles destroyed where it lands
+    boulderBreaks: 2, // tiles destroyed where each boulder lands
+    boulderCount: 3, // thrown together, each on a different arc
+    boulderArcDeg: 18, // angle between the arcs
   },
 };
 

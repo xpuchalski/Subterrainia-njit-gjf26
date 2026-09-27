@@ -221,12 +221,12 @@ export default class Enemy extends Phaser.Physics.Arcade.Sprite {
     return false;
   }
 
-  // Charging boss: smash blocks directly in front of it (its whole height, never the ground below),
-  // up to BOSS.chargeBreaks per charge
+  // Charging boss: smash blocks directly in front of it, starting with the ground row ahead of its
+  // feet and working up to head height, up to BOSS.chargeBreaks per charge
   smashAhead() {
     const b = this.body;
     const x = this.dir > 0 ? b.right + 6 : b.left - 6;
-    for (let y = b.top + 4; y < b.bottom - 4 && this.smashesLeft > 0; y += 16) {
+    for (let y = b.bottom + 16; y > b.top && this.smashesLeft > 0; y -= 16) {
       const t = this.scene.solidTileAt(x, y);
       if (t?.floor?.smashTile(t.tx, t.ty)) {
         this.smashesLeft--;
@@ -241,19 +241,28 @@ export default class Enemy extends Phaser.Physics.Arcade.Sprite {
   }
 
   // Thrower boss: tear a block out of the ground in front, then hurl it as a big boulder
+  // Thrower boss: tear blocks out of the ground in front, then hurl them as boulders on spread-out arcs
   throwBoulder(player) {
     const scene = this.scene;
     const frontX = this.x + this.dir * (this.body.width / 2 - 10);
-    const t = scene.solidTileAt(frontX, this.body.bottom + 4);
-    t?.floor?.smashTile(t.tx, t.ty);
+    const n = BOSS.boulderCount;
+    for (let i = 0; i < n; i++) {
+      const t = scene.solidTileAt(frontX + this.dir * (i - 1) * 32, this.body.bottom + 4);
+      t?.floor?.smashTile(t.tx, t.ty);
+    }
 
     this.throwUntil = scene.time.now + 400;
-    const boulder = scene.clods.create(frontX, this.body.top + this.body.height * 0.3, 'clod').setScale(BOSS.boulderScale).setDepth(4);
-    boulder.big = true;
-    boulder.damage = BOSS.boulderDamage;
-    boulder.dieAt = scene.time.now + 5000;
-    const angle = Math.atan2(player.y - boulder.y - 120, player.x - boulder.x);
-    boulder.setVelocity(Math.cos(angle) * BOSS.boulderSpeed, Math.sin(angle) * BOSS.boulderSpeed);
+    const y = this.body.top + this.body.height * 0.3;
+    const aim = Math.atan2(player.y - y - 120, player.x - frontX);
+    const spread = Phaser.Math.DegToRad(BOSS.boulderArcDeg);
+    for (let i = 0; i < n; i++) {
+      const angle = aim + (i - (n - 1) / 2) * spread; // lob, straight-ish, flat
+      const boulder = scene.clods.create(frontX, y, 'clod').setScale(BOSS.boulderScale).setDepth(4);
+      boulder.big = true;
+      boulder.damage = BOSS.boulderDamage;
+      boulder.dieAt = scene.time.now + 5000;
+      boulder.setVelocity(Math.cos(angle) * BOSS.boulderSpeed, Math.sin(angle) * BOSS.boulderSpeed);
+    }
   }
 
   throwClod(player) {

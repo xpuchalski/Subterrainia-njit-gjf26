@@ -209,16 +209,16 @@ export default class PreloadScene extends Phaser.Scene {
     pickaxe('pickaxe_blue', 0x42a5f5);
     pickaxe('pickaxe_mint', 0x98ffcc);
 
-    const shotgun = (key, stock, pump) =>
+    const shotgun = (key, wood, steel) =>
       make(key, 42, 10, (gr) => {
-        gr.fillStyle(stock).fillRect(0, 3, 14, 6); // stock
-        gr.fillStyle(0x2e2e33).fillRect(12, 2, 30, 3); // barrel
+        gr.fillStyle(wood).fillRect(0, 3, 14, 6); // stock
+        gr.fillStyle(steel).fillRect(12, 2, 30, 3); // barrel
         gr.fillStyle(0x3d3d44).fillRect(14, 5, 22, 3); // magazine tube
-        gr.fillStyle(pump).fillRect(24, 5, 8, 4); // pump
+        gr.fillStyle(wood).fillRect(24, 5, 8, 4); // pump
       });
-    shotgun('shotgun', 0x6b3f1f, 0x6b3f1f);
-    shotgun('shotgun_gold', 0xd4a017, 0xffc83d);
-    shotgun('shotgun_pink', 0xff69b4, 0xffa6d2);
+    shotgun('shotgun', 0x6b3f1f, 0x2e2e33);
+    shotgun('shotgun_gold', 0xd4a017, 0x2e2e33);
+    shotgun('shotgun_pink', 0xff69b4, 0xebe5e0);
     make('pellet', 4, 4, (gr) => gr.fillStyle(0xffe082).fillRect(0, 0, 4, 4));
     make('flash', 16, 16, (gr) => gr.fillStyle(0xfff3b0).fillCircle(8, 8, 8));
 
