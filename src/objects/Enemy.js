@@ -199,9 +199,11 @@ export default class Enemy extends Phaser.Physics.Arcade.Sprite {
       this.smashesLeft = BOSS.chargeBreaks;
     }
     if (this.attack === 'charge') {
-      this.smashAhead();
+      // Only stop at something it couldn't smash (side walls): 'blocked' is from the last physics
+      // step, so it's stale on a frame where we just broke the blocks in the way
+      const smashed = this.smashAhead();
       const b = this.body;
-      const hitWall = (this.dir < 0 && b.blocked.left) || (this.dir > 0 && b.blocked.right);
+      const hitWall = !smashed && ((this.dir < 0 && b.blocked.left) || (this.dir > 0 && b.blocked.right));
       if (time >= this.attackAt || hitWall) {
         if (hitWall) this.scene.cameras.main.shake(150, 0.01);
         this.endAttack(time);
@@ -221,18 +223,21 @@ export default class Enemy extends Phaser.Physics.Arcade.Sprite {
     return false;
   }
 
-  // Charging boss: smash blocks directly in front of it, starting with the ground row ahead of its
-  // feet and working up to head height, up to BOSS.chargeBreaks per charge
+  // Charging boss: smash every block directly in front of it, from the ground row ahead of its feet
+  // to just above its head (up to BOSS.chargeBreaks per charge). Returns true if anything broke.
   smashAhead() {
     const b = this.body;
     const x = this.dir > 0 ? b.right + 6 : b.left - 6;
-    for (let y = b.bottom + 16; y > b.top && this.smashesLeft > 0; y -= 16) {
+    let smashed = false;
+    for (let y = b.bottom + 16; y > b.top - 16 && this.smashesLeft > 0; y -= 16) {
       const t = this.scene.solidTileAt(x, y);
       if (t?.floor?.smashTile(t.tx, t.ty)) {
         this.smashesLeft--;
-        this.scene.cameras.main.shake(80, 0.006);
+        smashed = true;
       }
     }
+    if (smashed) this.scene.cameras.main.shake(80, 0.006);
+    return smashed;
   }
 
   endAttack(time) {

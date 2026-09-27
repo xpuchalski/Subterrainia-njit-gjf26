@@ -79,7 +79,7 @@ export default class MenuScene extends Phaser.Scene {
       equipped.pickaxe = 'pickaxe_bw';
       saveEquipped(equipped);
       sfx(this, 'click');
-      const t = this.add.text(cx, 290, 'UNLOCKED: B&W pickaxe!', { ...TEXT, fontSize: '22px', fontStyle: 'bold', color: '#ffffff', stroke: '#000000', strokeThickness: 4 }).setOrigin(0.5);
+      const t = this.add.text(cx, 290, 'UNLOCKED: ERROR pickaxe', { ...TEXT, fontSize: '22px', fontStyle: 'bold', color: '#ffffff', stroke: '#000000', strokeThickness: 4 }).setOrigin(0.5);
       this.tweens.add({ targets: t, alpha: 0, delay: 1200, duration: 400, onComplete: () => this.scene.restart() });
     });
 

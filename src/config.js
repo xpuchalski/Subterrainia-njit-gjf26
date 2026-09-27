@@ -180,7 +180,7 @@ export const ENEMY = {
     zoom: 1.5, // camera zooms out to this while a boss is alive on the layer
     contactDamage: 2,
     jumpVelocity: -500, // clears a 4-tile wall
-    chargeBreaks: 10, // blocks a charge can smash in front of it, including the ground row ahead
+    chargeBreaks: 40, // blocks a charge can smash (ground row ahead up to above its head); set a number to cap it
     knockbackMult: 0.15, // barely budges when hit
     telegraphMs: 500, // flashes this long before each attack
     attackRange: 620, // starts an attack when the player is this close (and roughly level)
