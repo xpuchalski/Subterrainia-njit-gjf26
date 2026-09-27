@@ -194,19 +194,21 @@ export default class PreloadScene extends Phaser.Scene {
     // Weapons: drawn pointing right, pivot at the left (hand) end
     // Pickaxe: a handle and a blocky curved head (tips step back toward the hand)
     // Unlockable skins (see UNLOCKS in config.js) only change the head / wood colors.
-    const pickaxe = (key, head) =>
+    const pickaxe = (key, head, tips = head) =>
       make(key, 36, 24, (gr) => {
         gr.fillStyle(0x6b3f1f).fillRect(0, 11, 30, 3); // handle
         gr.fillStyle(head)
           .fillRect(30, 7, 5, 10) // center
-          .fillRect(28, 3, 4, 4).fillRect(26, 0, 3, 3) // upper arm + tip
-          .fillRect(28, 17, 4, 4).fillRect(26, 21, 3, 3); // lower arm + tip
+          .fillRect(28, 3, 4, 4) // upper arm
+          .fillRect(28, 17, 4, 4); // lower arm
+        gr.fillStyle(tips).fillRect(26, 0, 3, 3).fillRect(26, 21, 3, 3); // tips
       });
     pickaxe('pickaxe', 0x3d3d44);
     pickaxe('pickaxe_coral', 0xff7f50);
     pickaxe('pickaxe_red', 0xc62828);
     pickaxe('pickaxe_gold', 0xffc83d);
     pickaxe('pickaxe_blue', 0x42a5f5);
+    pickaxe('pickaxe_bw', 0xf5f5f5, 0x111111); // white head, black tips
     pickaxe('pickaxe_mint', 0x98ffcc);
 
     const shotgun = (key, wood, steel) =>

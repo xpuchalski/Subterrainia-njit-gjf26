@@ -1,7 +1,7 @@
 import * as Phaser from 'phaser';
 import { UNLOCKS } from '../config.js';
 import { loadScores } from '../scoring.js';
-import { loadStats, isUnlocked, loadEquipped, saveEquipped, skinFor } from '../unlocks.js';
+import { loadStats, saveStats, isUnlocked, loadEquipped, saveEquipped, skinFor } from '../unlocks.js';
 import { playMusic, sfx } from '../audio.js';
 import { TEXT, blink } from '../ui.js';
 
@@ -64,6 +64,24 @@ export default class MenuScene extends Phaser.Scene {
       ...TEXT, fontSize: '20px', color: '#aaaaaa',
     }).setOrigin(0.5).setInteractive({ useHandCursor: true });
     blink(this, prompt, 0.2);
+
+    // Secret: up up down down left right left right B A unlocks (and equips) the B&W pickaxe
+    const code = ['UP', 'UP', 'DOWN', 'DOWN', 'LEFT', 'RIGHT', 'LEFT', 'RIGHT', 'B', 'A'].map((k) => Phaser.Input.Keyboard.KeyCodes[k]);
+    let progress = 0;
+    this.input.keyboard.on('keydown', (e) => {
+      progress = e.keyCode === code[progress] ? progress + 1 : e.keyCode === code[0] ? 1 : 0;
+      if (progress < code.length) return;
+      progress = 0;
+      if (stats.konami) return;
+      stats.konami = 1;
+      saveStats(stats);
+      const equipped = loadEquipped();
+      equipped.pickaxe = 'pickaxe_bw';
+      saveEquipped(equipped);
+      sfx(this, 'click');
+      const t = this.add.text(cx, 290, 'UNLOCKED: B&W pickaxe!', { ...TEXT, fontSize: '22px', fontStyle: 'bold', color: '#ffffff', stroke: '#000000', strokeThickness: 4 }).setOrigin(0.5);
+      this.tweens.add({ targets: t, alpha: 0, delay: 1200, duration: 400, onComplete: () => this.scene.restart() });
+    });
 
     // Clicks elsewhere don't start the game, so the unlock toggles can be clicked
     const start = () => {

@@ -2,7 +2,7 @@ import { STATS_KEY, EQUIPPED_KEY, UNLOCKS, SKIN_STATS } from './config.js';
 import { loadJSON, saveJSON } from './storage.js';
 
 // Lifetime stats, kept across runs
-export const loadStats = () => ({ kills: 0, shells: 0, deepest: 0, bosses: 0, playMs: 0, mintOrb: 0, ...loadJSON(STATS_KEY, {}) });
+export const loadStats = () => ({ kills: 0, shells: 0, deepest: 0, bosses: 0, playMs: 0, mintOrb: 0, konami: 0, ...loadJSON(STATS_KEY, {}) });
 export const saveStats = (stats) => saveJSON(STATS_KEY, stats);
 
 export const isUnlocked = (unlock, stats) => stats[unlock.stat] >= unlock.need;

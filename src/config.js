@@ -251,6 +251,7 @@ export const UNLOCKS = [
   { stat: 'deepest', need: 25, weapon: 'pickaxe', skin: 'pickaxe_gold', label: 'Gold pickaxe' },
   { stat: 'playMs', need: 60 * 60 * 1000, weapon: 'pickaxe', skin: 'pickaxe_blue', label: 'Blue pickaxe' },
   { stat: 'mintOrb', need: 1, weapon: 'pickaxe', skin: 'pickaxe_mint', label: 'Mint pickaxe' },
+  { stat: 'konami', need: 1, weapon: 'pickaxe', skin: 'pickaxe_bw', label: 'B&W pickaxe' }, // title screen: up up down down left right left right B A
 ];
 // What each skin does. Pickaxe: damage / speed (swing rate) / range multipliers, points = multiplier
 // on all points earned. Shotgun: pellets / shells multipliers, fullMag = one click dumps the tube.
@@ -260,6 +261,7 @@ export const SKIN_STATS = {
   pickaxe_gold: { speed: 1.6 },
   pickaxe_coral: { points: 5 },
   pickaxe_blue: { points: 2, damage: 1.2, speed: 1.2, range: 1.15 },
+  pickaxe_bw: { points: 10, damage: 5, speed: 5, range: 3 },
   shotgun_gold: { pellets: 3 },
   shotgun_pink: { shells: 2, fullMag: true },
 };
