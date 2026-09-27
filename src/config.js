@@ -153,8 +153,8 @@ export const ENEMY = {
     armSwingDeg: 14,
     breathMs: 1600,
   },
-  noticeRange: 260,
-  loseRange: 380,
+  noticeRange: 350,
+  loseRange: 400,
   jumpVelocity: -440, // clears a 3-tile wall
   contactDamage: 1,
   knockbackX: 200,
@@ -164,8 +164,8 @@ export const ENEMY = {
   // Ranged variant ("spitter") shows up from this floor number on
   spitterFromFloor: 5,
   spitterChance: 0.35,
-  spitterRange: 440,
-  spitterCooldownMs: 2000,
+  spitterRange: 640,
+  spitterCooldownMs: 1500,
   clodSpeed: 440,
   spitterHopVelocity: -300, // throwers hop as they throw
   // Points per kill; count toward the layer score like fossils (so they get the speed/depth multipliers)
@@ -180,10 +180,10 @@ export const ENEMY = {
     zoom: 1.5, // camera zooms out to this while a boss is alive on the layer
     contactDamage: 2,
     jumpVelocity: -500, // clears a 4-tile wall
-    chargeBreaks: 5, // blocks a charge can smash in front of it, including the ground row ahead
+    chargeBreaks: 10, // blocks a charge can smash in front of it, including the ground row ahead
     knockbackMult: 0.15, // barely budges when hit
-    telegraphMs: 1000, // flashes this long before each attack
-    attackRange: 420, // starts an attack when the player is this close (and roughly level)
+    telegraphMs: 500, // flashes this long before each attack
+    attackRange: 620, // starts an attack when the player is this close (and roughly level)
     cooldownMs: 1600,
     chargeSpeed: 430, // melee boss: charge
     chargeMs: 900,
