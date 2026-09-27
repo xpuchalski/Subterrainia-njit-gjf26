@@ -86,12 +86,8 @@ export default class Weapons {
     this.armDef = PLAYER_ART.arms[key];
   }
 
-  // Everything (aim, slash, muzzle) is measured from the shoulder
-  pivot() {
-    return this.player.shoulder();
-  }
-
-  // Pose the arm for aim angle `rot`; returns the world position of the hand.
+  // Pose the arm for aim angle `rot` around shoulder `p` (aim, slash and muzzle are all measured
+  // from the shoulder); returns the world position of the hand.
   // Facing left is the mirror image of facing right: flip the texture and negate the twist.
   poseArm(p, rot, left) {
     const { shoulder, hand, twistDeg } = this.armDef;
@@ -120,7 +116,7 @@ export default class Weapons {
     // Face the cursor first (that decides which side the shoulder is on), then aim from the shoulder
     const left = aim.x < player.x;
     player.setFlipX(left);
-    const p = this.pivot();
+    const p = this.player.shoulder();
     this.aimAngle = Math.atan2(aim.y - p.y, aim.x - p.x);
 
     const rot = this.aimAngle + (left ? -this.swingOffset : this.swingOffset);
@@ -173,7 +169,7 @@ export default class Weapons {
 
   swing(time) {
     this.nextSwingAt = time + PICKAXE.cooldownMs;
-    const { x, y } = this.pivot();
+    const { x, y } = this.player.shoulder();
     const angle = this.aimAngle;
     this.animateSwing();
 
@@ -228,7 +224,7 @@ export default class Weapons {
     this.slashGfx = g;
 
     const draw = () => {
-      const p = this.pivot();
+      const p = this.player.shoulder();
       g.setPosition(p.x, p.y).setRotation(aim).setScale(1, left ? -1 : 1);
       g.clear();
       const end = this.swingOffset;
@@ -267,7 +263,7 @@ export default class Weapons {
 
     const angle = this.aimAngle;
     // Muzzle = hand + the part of the gun in front of the grip
-    const hand = this.poseArm(this.pivot(), angle, this.player.flipX);
+    const hand = this.poseArm(this.player.shoulder(), angle, this.player.flipX);
     const barrel = this.sprite.displayWidth * (1 - this.sprite.originX);
     const muzzleX = hand.x + Math.cos(angle) * barrel;
     const muzzleY = hand.y + Math.sin(angle) * barrel;

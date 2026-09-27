@@ -1,5 +1,6 @@
 import * as Phaser from 'phaser';
 import { TILE, ENEMY, PLAYER_ART, SFX } from '../config.js';
+import { TEXT, blink } from '../ui.js';
 
 // Loads all game assets and shows a progress bar.
 export default class PreloadScene extends Phaser.Scene {
@@ -21,9 +22,11 @@ export default class PreloadScene extends Phaser.Scene {
     this.load.text('start_box', 'assets/start_box.txt'); // story shown at the start of a run
     this.load.audio('music_menu', 'assets/music/Menu-Theme.mp3');
     this.load.audio('music_game', 'assets/music/Game-Theme.mp3');
+    this.load.audio('music_boss', 'assets/music/boss_theme.mp3');
     for (const [name, def] of Object.entries(SFX)) this.load.audio(`sfx_${name}`, `assets/sfx/${def.file}`);
-    this.load.image('enemy', 'assets/sprites/enemy.png');
-    this.load.image('enemy_spitter', 'assets/sprites/enemy_spitter.png');
+    for (const prefix of ['enemy_', 'enemy_thrower_']) {
+      for (const { name } of ENEMY.rig.parts) this.load.image(`${prefix}${name}`, `assets/sprites/${prefix}${name}.png`);
+    }
     for (const tier of ['common', 'uncommon', 'rare']) this.load.image(`fossil_${tier}_art`, `assets/sprites/fossil_${tier}.png`);
   }
 
@@ -40,10 +43,7 @@ export default class PreloadScene extends Phaser.Scene {
     }
     this.children.removeAll(true); // clear the loading bar
     const { width, height } = this.scale;
-    const prompt = this.add.text(width / 2, height / 2, 'Click anywhere to begin', {
-      fontFamily: 'monospace', fontSize: '24px', color: '#dddddd',
-    }).setOrigin(0.5);
-    this.tweens.add({ targets: prompt, alpha: 0.3, duration: 700, yoyo: true, repeat: -1 });
+    blink(this, this.add.text(width / 2, height / 2, 'Click anywhere to begin', { ...TEXT, fontSize: '24px', color: '#dddddd' }).setOrigin(0.5));
     let started = false;
     const go = () => {
       if (started) return;
@@ -82,9 +82,7 @@ export default class PreloadScene extends Phaser.Scene {
       if (!this.textures.exists(`fossil_${tier}_art`)) continue; // falls back to the placeholder circles
       const { w, h, px } = this.trimmed(`fossil_${tier}_art`);
       const tex = this.textures.createCanvas(`fossil_${tier}`, w, h);
-      const img = tex.context.createImageData(w, h);
-      img.data.set(px);
-      tex.context.putImageData(img, 0, 0);
+      tex.context.putImageData(new ImageData(new Uint8ClampedArray(px), w, h), 0, 0);
       tex.refresh();
     }
   }
@@ -186,11 +184,12 @@ export default class PreloadScene extends Phaser.Scene {
     box('player_crouch', 18, 24, 0x4fc3f7, 0x0d47a1);
     make('arm_extended', 4, 12, (gr) => gr.fillStyle(0x0d47a1).fillRect(0, 0, 4, 12));
     make('arm_bent', 6, 8, (gr) => gr.fillStyle(0x0d47a1).fillRect(0, 0, 4, 8).fillRect(0, 5, 6, 3));
-    // Enemy fallbacks, in art pixels (enemies are drawn at ENEMY.artScale)
-    const ew = Math.round(ENEMY.width / ENEMY.artScale);
-    const eh = Math.round(ENEMY.height / ENEMY.artScale);
-    box('enemy', ew, eh, 0x5c6170, 0x14141c);
-    box('enemy_spitter', ew, eh, 0x685478, 0x16101e);
+    // Enemy fallbacks (only if the part PNGs are missing): a box torso on the rig canvas, empty limbs
+    const hb = ENEMY.rig.hitbox;
+    for (const [prefix, fill] of [['enemy_', 0x5c6170], ['enemy_thrower_', 0x685478]]) {
+      make(`${prefix}torso`, 64, 64, (gr) => gr.fillStyle(fill).fillRect(hb.x, hb.y, hb.w, hb.h));
+      for (const { name } of ENEMY.rig.parts) if (name !== 'torso') make(`${prefix}${name}`, 64, 64, () => {});
+    }
 
     // Weapons: drawn pointing right, pivot at the left (hand) end
     // Pickaxe: a handle and a blocky curved head (tips step back toward the hand)

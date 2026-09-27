@@ -15,6 +15,7 @@ const AIR = -1;
 const DIRT = 0;
 const STONE = 1;
 const WALL = 2;
+export const WALL_TILE = WALL;
 
 const WALL_TINT = 0x9a9a9a;
 
@@ -36,10 +37,20 @@ export default class Floor {
     this.enemies = [];
     this.colliders = [];
 
+    // Enemy count + whether this layer gets a boss (decided first: the boss needs an arena carved)
+    this.enemyCount = 0;
+    this.hasBoss = false;
+    if (floorNum >= ENEMY.firstFloor) {
+      const floorIndex = floorNum - ENEMY.firstFloor;
+      this.enemyCount = Math.min(ENEMY.countMax, ENEMY.countBase + Math.floor(floorIndex / 2) * ENEMY.countPerTwoFloors);
+      this.hasBoss = floorNum === ENEMY.boss.guaranteedFloor ||
+        Array.from({ length: this.enemyCount }).some(() => this.rng.frac() < ENEMY.boss.chance);
+    }
+
     const grid = this.generateGrid();
     this.buildLayer(grid);
     this.placeFossils(grid);
-    if (floorNum >= ENEMY.firstFloor) this.placeEnemies(grid);
+    if (this.enemyCount) this.placeEnemies(grid);
     if (floorNum === 1) this.placeSign();
   }
 
@@ -131,6 +142,8 @@ export default class Floor {
       for (let c = c0; c < c0 + len; c++) grid[r][c] = DIRT;
     }
 
+    if (this.hasBoss) this.carveArena(grid, surface);
+
     // Unbreakable side walls
     for (let r = 0; r < FLOOR_ROWS; r++) {
       grid[r][0] = WALL;
@@ -139,6 +152,27 @@ export default class Floor {
 
     this.surface = surface;
     return grid;
+  }
+
+  // A flat, open stretch of surface for the boss (it's ~8 x 7 tiles), away from where the player lands
+  carveArena(grid, surface) {
+    const rng = this.rng;
+    const W = 12;
+    const H = 8;
+    let c0 = 2;
+    for (let tries = 0; tries < 50; tries++) {
+      c0 = rng.between(2, FLOOR_COLS - 2 - W);
+      if (Math.abs(c0 + W / 2 - this.entryCol) >= 14) break;
+    }
+    let ground = 0;
+    for (let c = c0; c < c0 + W; c++) ground = Math.max(ground, surface[c]);
+    ground = Math.max(ground, H + 1);
+    for (let c = c0; c < c0 + W; c++) {
+      for (let r = ground - H; r < ground; r++) grid[r][c] = AIR; // headroom (clears platforms too)
+      for (let r = ground; r < ground + 2; r++) if (grid[r][c] === AIR) grid[r][c] = DIRT; // flat floor
+      surface[c] = ground;
+    }
+    this.arena = { c0, W, ground };
   }
 
   buildLayer(grid) {
@@ -282,19 +316,29 @@ export default class Floor {
 
   placeEnemies(grid) {
     const rng = this.rng;
-    const floorIndex = this.floorNum - ENEMY.firstFloor;
-    const count = Math.min(ENEMY.countMax, ENEMY.countBase + Math.floor(floorIndex / 2) * ENEMY.countPerTwoFloors);
+    const count = this.enemyCount;
+    const pickKind = () => (this.floorNum >= ENEMY.spitterFromFloor && rng.frac() < ENEMY.spitterChance ? 'spitter' : 'melee');
+    const spawn = (x, feetY, kind, boss = false) => {
+      const enemy = new Enemy(this.scene, x, feetY, kind, this, boss);
+      this.enemies.push(enemy);
+      this.scene.enemies.add(enemy);
+    };
+
+    // The boss (if any) takes one slot and stands in the middle of its arena
+    const a = this.arena;
+    if (a) spawn((a.c0 + a.W / 2) * TILE, this.y + a.ground * TILE, pickKind(), true);
+    const inArena = (c) => a && c >= a.c0 - 2 && c < a.c0 + a.W + 2;
 
     // Enemies are bigger than a tile, so they need an open 3x3 spot on solid ground
     const open = (c, r) => grid[r]?.[c] === AIR;
     const spots = [];
     for (let c = 2; c < FLOOR_COLS - 2; c++) {
-      if (Math.abs(c - this.entryCol) < ENEMY.spawnSafeCols) continue;
+      if (Math.abs(c - this.entryCol) < ENEMY.spawnSafeCols || inArena(c)) continue;
       for (let r = ENTRY_ROWS + 1; r < FLOOR_ROWS - 1; r++) {
         // 3 tiles wide and 3 tall (they're ~1.5 x 2.1 tiles)
         let fits = true;
         for (let dr = 0; dr < 3 && fits; dr++) for (let dc = -1; dc <= 1 && fits; dc++) fits = open(c + dc, r - dr);
-        if (fits && grid[r + 1][c] !== AIR) spots.push([c, r]);
+        if (fits && [-1, 0, 1].every((dc) => grid[r + 1][c + dc] !== AIR)) spots.push([c, r]); // solid 3 wide underfoot
       }
     }
     rng.shuffle(spots);
@@ -304,10 +348,7 @@ export default class Floor {
       if (this.enemies.length >= count) break;
       if (usedCols.some((u) => Math.abs(u - c) < 4)) continue;
       usedCols.push(c);
-      const kind = this.floorNum >= ENEMY.spitterFromFloor && rng.frac() < ENEMY.spitterChance ? 'spitter' : 'melee';
-      const enemy = new Enemy(this.scene, c * TILE + TILE / 2, this.y + (r + 1) * TILE - ENEMY.height / 2, kind, this);
-      this.enemies.push(enemy);
-      this.scene.enemies.add(enemy);
+      spawn(c * TILE + TILE / 2, this.y + (r + 1) * TILE, pickKind()); // feet on the ground
     }
   }
 

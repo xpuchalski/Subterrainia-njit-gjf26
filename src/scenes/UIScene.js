@@ -2,8 +2,9 @@ import * as Phaser from 'phaser';
 import { PLAYER, SHOTGUN } from '../config.js';
 import { formatTime } from '../scoring.js';
 import { sfx } from '../audio.js';
+import { TEXT, blink } from '../ui.js';
 
-const FONT = { fontFamily: 'monospace', fontSize: '18px', color: '#ffffff', stroke: '#000000', strokeThickness: 3 };
+const FONT = { ...TEXT, align: 'left', fontSize: '18px', stroke: '#000000', strokeThickness: 3 };
 
 // HUD drawn on top of GameScene; unaffected by the game camera.
 export default class UIScene extends Phaser.Scene {
@@ -14,6 +15,7 @@ export default class UIScene extends Phaser.Scene {
   create() {
     const { width, height } = this.scale;
     const game = this.scene.get('Game');
+    this.gameScene = game; // the HUD reads its state directly each frame
 
     // Health
     this.hearts = [];
@@ -38,20 +40,23 @@ export default class UIScene extends Phaser.Scene {
     });
 
     this.add.text(width - 12, height - 12,
-      'A/D | move · Space/W | jump · S/Shift | crouch · Click | use · R | reload · 1/2/scroll wheel | swap',
-      { fontFamily: 'monospace', fontSize: '11px', color: '#dddddd', stroke: '#000000', strokeThickness: 2 }
+      'A/D · move | Space/W · jump | S/Shift · crouch | Click · use | R · reload | 1/2/scroll wheel · swap | Esc · pause',
+      { ...FONT, fontSize: '11px', color: '#dddddd', strokeThickness: 2 }
     ).setOrigin(1, 1).setAlpha(0.7);
 
     this.buildResultsPanel(width, height);
 
     // Results screen: the game scene pauses itself; a click here resumes it
     const onResults = (r) => this.showResults(r);
-    const onUnlock = (label) => this.showUnlock(label);
+    const onUnlock = (label) => this.showBanner(`UNLOCKED: ${label}!`);
+    const onBanner = (text, color) => this.showBanner(text, color);
+    game.events.on('banner', onBanner);
     game.events.on('floor-results', onResults);
     game.events.on('unlock', onUnlock);
     this.events.once('shutdown', () => {
       game.events.off('floor-results', onResults);
       game.events.off('unlock', onUnlock);
+      game.events.off('banner', onBanner);
     });
     // Click / Space / Enter advances whichever overlay is open
     const advance = () => {
@@ -118,18 +123,17 @@ export default class UIScene extends Phaser.Scene {
     const bg = this.add.rectangle(0, 0, 360, 340, 0x000000, 0.8).setStrokeStyle(2, 0xffffff, 0.6);
     this.resultsTitle = this.add.text(0, -132, '', { ...FONT, fontSize: '22px', fontStyle: 'bold' }).setOrigin(0.5);
     this.resultsBody = this.add.text(-150, -100, '', { ...FONT, fontSize: '16px', lineSpacing: 6 });
-    const hint = this.add.text(0, 140, 'Click to continue', { ...FONT, fontSize: '14px', color: '#aaaaaa' }).setOrigin(0.5);
-    this.tweens.add({ targets: hint, alpha: 0.3, duration: 600, yoyo: true, repeat: -1 });
+    const hint = blink(this, this.add.text(0, 140, 'Click to continue', { ...FONT, fontSize: '14px', color: '#aaaaaa' }).setOrigin(0.5), 0.3, 600);
     this.results = this.add.container(width / 2, height / 2 - 10, [bg, this.resultsTitle, this.resultsBody, hint]);
     this.results.setVisible(false);
   }
 
-  // Banners stack if several unlock at once
-  showUnlock(label) {
+  // Center-screen announcement (unlocks, boss). Banners stack if several show at once.
+  showBanner(text, color = '#ffc83d') {
     const { width } = this.scale;
     const y = 90 + (this.unlockBanners = (this.unlockBanners ?? 0) + 1) * 34;
-    const t = this.add.text(width / 2, y, `UNLOCKED: ${label}!`, {
-      ...FONT, fontSize: '22px', fontStyle: 'bold', color: '#ffc83d', strokeThickness: 5,
+    const t = this.add.text(width / 2, y, text, {
+      ...FONT, fontSize: '22px', fontStyle: 'bold', color, strokeThickness: 5,
     }).setOrigin(0.5).setAlpha(0);
     this.tweens.chain({
       targets: t,
@@ -156,19 +160,18 @@ export default class UIScene extends Phaser.Scene {
   }
 
   update() {
-    const r = this.registry;
-    const hp = r.get('hp') ?? 0;
+    const g = this.gameScene;
+    const { hp } = g.player;
+    const { shells, reloading } = g.weapons;
+    const gun = g.weapons.current === 'shotgun';
+
     this.hearts.forEach((h, i) => h.setAlpha(i < hp ? 1 : 0.2));
-
-    this.scoreText.setText(`SCORE ${r.get('score') ?? 0}`);
-    this.floorText.setText(`Layer ${r.get('floor') ?? 1}`);
-    this.timeText.setText(`Time ${formatTime(r.get('floorTime') ?? 0)}`);
-
-    const gun = r.get('weapon') === 'shotgun';
+    this.scoreText.setText(`SCORE ${g.totalScore}`);
+    this.floorText.setText(`Layer ${g.floorNum}`);
+    this.timeText.setText(`Time ${formatTime(g.floorTime)}`);
     this.pickLabel.setColor(gun ? '#777777' : '#ffffff');
     this.gunLabel.setColor(gun ? '#ffffff' : '#777777');
-    const shells = r.get('shells') ?? 0;
     this.shellIcons.forEach((s, i) => s.setAlpha(i < shells ? (gun ? 1 : 0.5) : 0.12));
-    this.reloadText.setVisible(!!r.get('reloading'));
+    this.reloadText.setVisible(reloading);
   }
 }

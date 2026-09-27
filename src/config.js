@@ -47,8 +47,8 @@ export const PLAYER = {
 // Arms are drawn hanging down with the shoulder at the top center. The body is cropped automatically;
 // the crouch frame is built from it by squashing the legs until a drawn one exists.
 export const PLAYER_ART = {
-  // Draw scale for the player, her arms and weapons (hitbox scales too). 4/3 x CAMERA_ZOOM 1.5 = 2,
-  // so each art pixel is exactly 2x2 screen pixels and stays crisp.
+  // Draw scale for the player, her arms and weapons (hitbox scales too). Pixel art stays even when
+  // scale x CAMERA_ZOOM is a whole number (e.g. 4/3 x 1.5 = 2, or 1 x 2 = 2).
   scale: 4 / 3,
   shoulder: { x: 3, y: 17 }, // pixel on the (cropped) body where the arm attaches, facing right
   armScale: 1.3, // arms draw this much bigger than the body (1 = same pixel size)
@@ -114,7 +114,7 @@ export const FOSSIL_WEIGHT_MIN_COMMON = 25;
 export const SURFACE_FOSSILS = [8, 12];
 export const BURIED_FOSSILS = [12, 18];
 export const BURIED_FOSSIL_ALPHA = 0.3;
-export const FOSSIL_ART_SCALE = 4 / 3; // same pixel size as the player (x CAMERA_ZOOM 1.5 = 2 screen px)
+export const FOSSIL_ART_SCALE = 4 / 3; // same pixel size as the player
 // Buried skeletons: a rare 'skull' at the head followed by a trail of lesser bones
 export const SKELETON_ATTEMPTS = 2; // tries per layer
 export const SKELETON_CHANCE = 0.6; // chance each try spawns one
@@ -124,17 +124,34 @@ export const SKELETON_UNCOMMON_BONES = 2; // the first N bones behind the skull 
 // --- Enemies ---
 export const ENEMY = {
   firstFloor: 2, // no enemies on floor 1
-  countBase: 4,
+  countBase: 5,
   countPerTwoFloors: 1,
-  countMax: 10,
-  baseHp: 4,
-  hpScalePerFloor: 0.08,
+  countMax: 13,
+  baseHp: 5,
+  hpScalePerFloor: 0.35, // hp = baseHp x (1 + this x (layer - 1)): layer 5 = 12, layer 10 = ~21, layer 15 = ~30
   patrolSpeed: 60,
   chaseSpeed: 125,
-  // Wider than a 1-tile gap so they can't drop down the player's shaft
-  width: 48, // world px (hitbox)
-  height: 68, // spawn clearance; the actual hitbox height comes from the art
-  artScale: 4 / 3, // enemy.png is 36x51 art px; x4/3 = 48x68, same pixel size as the player
+  // Wider than a 1-tile gap so they can't drop down the player's shaft (world px = art px x artScale)
+  width: 38 * (4 / 3), // hitbox width (height comes from the art)
+  artScale: 4 / 3, // same pixel size as the player
+  // Body parts: public/assets/sprites/enemy_<part>.png (thrower: enemy_thrower_<part>.png), all drawn
+  // in place on the same 64x64 canvas. Positions below are canvas pixels, facing right.
+  rig: {
+    hitbox: { x: 13, y: 13, w: 38, h: 30 }, // torso + legs, centered on the canvas
+    feetY: 43,
+    // draw order back-to-front, and the joint each part rotates around
+    parts: [
+      { name: 'R_arm', joint: [29, 18] }, // back arm
+      { name: 'R_leg', joint: [25, 33] }, // back leg
+      { name: 'L_leg', joint: [34, 32] }, // front leg
+      { name: 'torso', joint: [32, 32] },
+      { name: 'L_arm', joint: [40, 28] }, // front arm
+    ],
+    walkCyclesPerPx: 1 / 48, // one full step cycle per 48px travelled
+    legSwingDeg: 22,
+    armSwingDeg: 14,
+    breathMs: 1600,
+  },
   noticeRange: 260,
   loseRange: 380,
   jumpVelocity: -380,
@@ -151,6 +168,26 @@ export const ENEMY = {
   clodSpeed: 320,
   // Points per kill; count toward the layer score like fossils (so they get the speed/depth multipliers)
   killPoints: { melee: 25, spitter: 40 },
+  // Rare boss version of either kind. At most one per layer; it gets a cleared arena on the surface.
+  boss: {
+    chance: 1 / 150, // per enemy spawned
+    guaranteedFloor: 8,
+    scale: 5, // x the normal size (hitbox too)
+    hpMult: 10,
+    killBonus: 15000, // added straight to the total score (not multiplied)
+    zoom: 1.5, // camera zooms out to this while a boss is alive on the layer
+    contactDamage: 2,
+    knockbackMult: 0.15, // barely budges when hit
+    telegraphMs: 1000, // flashes this long before each attack
+    attackRange: 420, // starts an attack when the player is this close (and roughly level)
+    cooldownMs: 1600,
+    chargeSpeed: 430, // melee boss: charge
+    chargeMs: 900,
+    boulderSpeed: 380, // thrower boss: rips up a block and throws a boulder
+    boulderScale: 3,
+    boulderDamage: 2,
+    boulderBreaks: 2, // tiles destroyed where it lands
+  },
 };
 
 // --- Scoring ---
@@ -162,6 +199,7 @@ export const SPEED_BRACKETS = [
   { under: Infinity, mult: 0.75 },
 ];
 export const DEPTH_MULT_PER_FLOOR = 0.25;
+export const HEAL_EVERY_POINTS = 15000; // +1 HP (up to max) each time the total score passes a multiple of this
 
 // Colors (same on every layer; BACKGROUND_COLOR is the game's clear color)
 export const TERRAIN_COLOR = 0x8d6e63;

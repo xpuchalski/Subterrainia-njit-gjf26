@@ -1,13 +1,14 @@
 import * as Phaser from 'phaser';
-import { TILE, FLOOR_COLS, FLOOR_GAP, SHOTGUN, ENEMY, PICKAXE, CAMERA_ZOOM } from '../config.js';
-import Floor, { shiftBody } from '../world/Floor.js';
+import {
+  TILE, FLOOR_COLS, FLOOR_GAP, SHOTGUN, ENEMY, PICKAXE, CAMERA_ZOOM, UNLOCKS, HEAL_EVERY_POINTS, PLAYER,
+} from '../config.js';
+import Floor, { shiftBody, WALL_TILE } from '../world/Floor.js';
 import Player from '../objects/Player.js';
 import Weapons from '../objects/Weapons.js';
 import Enemy from '../objects/Enemy.js';
 import Fx from '../fx.js';
-import { playMusic } from '../audio.js';
+import { playMusic, sfx } from '../audio.js';
 import { speedMultiplier, depthMultiplier, floorScore, recordScore } from '../scoring.js';
-import { UNLOCKS } from '../config.js';
 import { loadStats, saveStats, isUnlocked } from '../unlocks.js';
 
 export default class GameScene extends Phaser.Scene {
@@ -33,11 +34,13 @@ export default class GameScene extends Phaser.Scene {
     // Run state
     this.floorNum = 1;
     this.totalScore = 0;
+    this.nextHealAt = HEAL_EVERY_POINTS;
     this.layerPoints = 0;
     this.floorTime = 0; // runs only while 'playing', i.e. after landing on the layer
     this.state = 'entering'; // 'entering' (falling into a layer) | 'playing' | 'dead'
     this.floors = [];
     this.prevFloor = null;
+    this.bossMode = false; // scene properties survive restarts, so reset it here
 
     const entryX = 5 * TILE;
     this.player = new Player(this, entryX, TILE * 2);
@@ -49,10 +52,10 @@ export default class GameScene extends Phaser.Scene {
 
     // Combat overlaps
     this.physics.add.overlap(this.player, this.enemies, (player, enemy) => {
-      player.takeDamage(ENEMY.contactDamage, enemy.x, true);
+      player.takeDamage(enemy.contactDamage, enemy.x, true);
     });
     this.physics.add.overlap(this.player, this.clods, (player, clod) => {
-      if (player.takeDamage(1, clod.x)) clod.destroy();
+      if (player.takeDamage(clod.damage ?? 1, clod.x)) clod.destroy();
     });
     this.physics.add.overlap(this.weapons.pellets, this.enemies, (a, b) => {
       const [pellet, enemy] = a instanceof Enemy ? [b, a] : [a, b];
@@ -65,12 +68,15 @@ export default class GameScene extends Phaser.Scene {
     this.events.once('player-died', () => this.onPlayerDied());
     this.events.once('shutdown', () => this.events.off('player-died'));
 
-    this.input.keyboard.on('keydown-ESC', () => {
-      this.scene.stop('UI');
-      this.scene.start('Menu');
-    });
+    // Esc / P: pause menu (not while another overlay already has the game paused, or after death)
+    const pause = () => {
+      if (this.state === 'dead' || !this.player.alive || this.scene.isPaused()) return;
+      this.scene.pause();
+      this.scene.launch('Pause');
+    };
+    this.input.keyboard.on('keydown-ESC', pause);
+    this.input.keyboard.on('keydown-P', pause);
 
-    this.syncRegistry();
     this.scene.launch('UI');
   }
 
@@ -79,10 +85,26 @@ export default class GameScene extends Phaser.Scene {
     floor.colliders.push(
       this.physics.add.collider(this.player, floor.layer),
       this.physics.add.collider(this.enemies, floor.layer),
-      this.physics.add.collider(this.clods, floor.layer, (clod) => clod.destroy())
+      this.physics.add.collider(this.clods, floor.layer, (clod, tile) => this.clodHitsTerrain(clod, floor, tile))
     );
     this.floors.push(floor);
     return floor;
+  }
+
+  // Clods just break; a boss boulder also smashes the tile it hit and the next one along its path
+  clodHitsTerrain(clod, floor, tile) {
+    if (clod.big) {
+      const along = Math.sign(clod.body.velocity.x) || 1;
+      const targets = [[tile.x, tile.y], [tile.x + along, tile.y]].slice(0, ENEMY.boss.boulderBreaks);
+      for (const [tx, ty] of targets) {
+        const t = floor.layer.getTileAt(tx, ty);
+        if (t && t.index !== WALL_TILE) floor.breakTile(tx, ty);
+      }
+      this.fx.dust(clod.x, clod.y, 0x8d6e63, 24);
+      this.cameras.main.shake(120, 0.008);
+      sfx(this, 'blockBreak');
+    }
+    clod.destroy();
   }
 
   // ------------------------------------------------------------ terrain helpers
@@ -155,7 +177,6 @@ export default class GameScene extends Phaser.Scene {
 
     if (this.state === 'playing' && this.player.alive) this.floorTime += delta / 1000;
     this.updateFloorFlow();
-    this.syncRegistry();
   }
 
   // Change lifetime stats, save them, and announce any unlocks that just crossed their threshold
@@ -194,6 +215,10 @@ export default class GameScene extends Phaser.Scene {
     if (this.state === 'entering' && p.body.blocked.down && p.y > this.current.y) {
       this.state = 'playing';
       this.updateStats((s) => (s.deepest = Math.max(s.deepest, this.floorNum)));
+      if (this.enemies.getChildren().some((e) => e.boss && e.floor === this.current)) {
+        this.events.emit('banner', 'Something huge stirs nearby...', '#ff6b6b');
+        this.setBossMode(true);
+      }
     }
 
     // Once only one floor exists, move it (and everything on it) back to y = 0
@@ -213,9 +238,11 @@ export default class GameScene extends Phaser.Scene {
       floorScore: floorScore(this.layerPoints, seconds, this.floorNum),
     };
     this.totalScore += results.floorScore;
+    this.healFromScore();
     results.total = this.totalScore;
     this.events.emit('floor-results', results);
 
+    this.setBossMode(false); // left a boss behind
     this.prevFloor = this.current;
     this.floorNum++;
     this.layerPoints = 0;
@@ -225,6 +252,36 @@ export default class GameScene extends Phaser.Scene {
 
     // Freeze the game on the results screen until the player clicks it away (UIScene resumes us)
     this.scene.pause();
+  }
+
+  // Boss fight: zoom out to fit it on screen and switch to the boss theme; undo when it's over
+  setBossMode(on) {
+    if (on === !!this.bossMode) return;
+    this.bossMode = on;
+    this.cameras.main.zoomTo(on ? ENEMY.boss.zoom : CAMERA_ZOOM, 800, 'Sine.easeInOut');
+    playMusic(this, on ? 'music_boss' : 'music_game');
+  }
+
+  // Boss kill: a flat bonus straight onto the total score (can trigger a heal), then back to normal
+  onBossKilled(boss) {
+    const bonus = ENEMY.boss.killBonus;
+    this.totalScore += bonus;
+    this.healFromScore();
+    this.fx.floatText(boss.x, boss.body.top - 8, `+${bonus}`, '#ffc83d');
+    this.setBossMode(false);
+  }
+
+  // +1 HP for every HEAL_EVERY_POINTS of total score (a big layer can cross several thresholds)
+  healFromScore() {
+    let heals = 0;
+    while (this.totalScore >= this.nextHealAt) {
+      heals++;
+      this.nextHealAt += HEAL_EVERY_POINTS;
+    }
+    const gained = Math.min(heals, PLAYER.maxHp - this.player.hp);
+    if (gained <= 0) return;
+    this.player.hp += gained;
+    this.fx.floatText(this.player.x, this.player.body.top - 12, `+${gained} HP`, '#7cfc9a');
   }
 
   // Called by UIScene when a pausing overlay (results screen, story box) is dismissed
@@ -241,7 +298,7 @@ export default class GameScene extends Phaser.Scene {
     this.cameras.main.scrollY -= dy;
   }
 
-  // ------------------------------------------------------------ death / HUD
+  // ------------------------------------------------------------ death
 
   onPlayerDied() {
     this.weapons.cancelReload();
@@ -252,16 +309,5 @@ export default class GameScene extends Phaser.Scene {
       this.scene.launch('GameOver', { score: this.totalScore, floor: this.floorNum, rank });
       this.scene.pause();
     });
-  }
-
-  syncRegistry() {
-    const r = this.registry;
-    r.set('hp', this.player.hp);
-    r.set('score', this.totalScore);
-    r.set('floor', this.floorNum);
-    r.set('floorTime', this.floorTime);
-    r.set('weapon', this.weapons.current);
-    r.set('shells', this.weapons.shells);
-    r.set('reloading', this.weapons.reloading);
   }
 }
