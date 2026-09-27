@@ -2,14 +2,14 @@ import * as Phaser from 'phaser';
 import {
   TILE, FLOOR_COLS, FLOOR_GAP, SHOTGUN, ENEMY, PICKAXE, CAMERA_ZOOM, UNLOCKS, HEAL_EVERY_POINTS, PLAYER,
 } from '../config.js';
-import Floor, { shiftBody, WALL_TILE } from '../world/Floor.js';
+import Floor, { shiftBody } from '../world/Floor.js';
 import Player from '../objects/Player.js';
 import Weapons from '../objects/Weapons.js';
 import Enemy from '../objects/Enemy.js';
 import Fx from '../fx.js';
 import { playMusic, sfx } from '../audio.js';
 import { speedMultiplier, depthMultiplier, floorScore, recordScore } from '../scoring.js';
-import { loadStats, saveStats, isUnlocked } from '../unlocks.js';
+import { loadStats, saveStats, isUnlocked, loadEquipped, saveEquipped } from '../unlocks.js';
 
 export default class GameScene extends Phaser.Scene {
   constructor() {
@@ -66,7 +66,11 @@ export default class GameScene extends Phaser.Scene {
 
     // Scene event listeners survive restarts, so clear ours on shutdown
     this.events.once('player-died', () => this.onPlayerDied());
-    this.events.once('shutdown', () => this.events.off('player-died'));
+    this.unsavedPlayMs = 0;
+    this.events.once('shutdown', () => {
+      this.events.off('player-died');
+      this.savePlayTime();
+    });
 
     // Esc / P: pause menu (not while another overlay already has the game paused, or after death)
     const pause = () => {
@@ -96,13 +100,8 @@ export default class GameScene extends Phaser.Scene {
     if (clod.big) {
       const along = Math.sign(clod.body.velocity.x) || 1;
       const targets = [[tile.x, tile.y], [tile.x + along, tile.y]].slice(0, ENEMY.boss.boulderBreaks);
-      for (const [tx, ty] of targets) {
-        const t = floor.layer.getTileAt(tx, ty);
-        if (t && t.index !== WALL_TILE) floor.breakTile(tx, ty);
-      }
-      this.fx.dust(clod.x, clod.y, 0x8d6e63, 24);
+      for (const [tx, ty] of targets) floor.smashTile(tx, ty);
       this.cameras.main.shake(120, 0.008);
-      sfx(this, 'blockBreak');
     }
     clod.destroy();
   }
@@ -131,7 +130,8 @@ export default class GameScene extends Phaser.Scene {
   // player's body spans on that side (so you can dig a hole you actually fit through),
   // reaching one tile further if the adjacent row is open. Diagonal aims hit the first
   // solid tile along the aim ray.
-  pickaxeTerrain(angle) {
+  // mod = the equipped pickaxe's { damage, reach, extraTiles }
+  pickaxeTerrain(angle, mod) {
     const b = this.player.body;
     const deg = Phaser.Math.RadToDeg(angle);
     const hitFirstSolid = (points) => {
@@ -142,7 +142,7 @@ export default class GameScene extends Phaser.Scene {
         const k = `${t.floor.floorNum}:${t.tx},${t.ty}`;
         if (hit.has(k)) continue;
         hit.add(k);
-        t.floor.damageTile(t.tx, t.ty, PICKAXE.tileDamage);
+        t.floor.damageTile(t.tx, t.ty, mod.damage);
       }
       return hit.size > 0;
     };
@@ -154,13 +154,13 @@ export default class GameScene extends Phaser.Scene {
     else if (Math.abs(deg) < 30) pointsAt = (d) => [[b.right + d, b.top + 2], [b.right + d, b.bottom - 2]];
     else if (Math.abs(deg) > 150) pointsAt = (d) => [[b.left - d, b.top + 2], [b.left - d, b.bottom - 2]];
     if (pointsAt) {
-      for (let extra = 0; extra <= PICKAXE.extraTiles; extra++) {
+      for (let extra = 0; extra <= mod.extraTiles; extra++) {
         if (hitFirstSolid(pointsAt(4 + extra * TILE))) return;
       }
     }
 
     // Ray from the body center; stop at the first solid tile
-    for (let d = 6; d <= PICKAXE.reach; d += 6) {
+    for (let d = 6; d <= mod.reach; d += 6) {
       if (hitFirstSolid([[b.center.x + Math.cos(angle) * d, b.center.y + Math.sin(angle) * d]])) return;
     }
   }
@@ -176,7 +176,16 @@ export default class GameScene extends Phaser.Scene {
     for (const c of [...this.clods.getChildren()]) if (time >= c.dieAt) c.destroy();
 
     if (this.state === 'playing' && this.player.alive) this.floorTime += delta / 1000;
+    this.unsavedPlayMs += delta;
+    if (this.unsavedPlayMs >= 10000) this.savePlayTime();
     this.updateFloorFlow();
+  }
+
+  // Lifetime play time (for the blue pickaxe), saved in chunks rather than every frame
+  savePlayTime() {
+    const ms = this.unsavedPlayMs;
+    this.unsavedPlayMs = 0;
+    if (ms > 0) this.updateStats((s) => (s.playMs += ms));
   }
 
   // Change lifetime stats, save them, and announce any unlocks that just crossed their threshold
@@ -186,12 +195,18 @@ export default class GameScene extends Phaser.Scene {
     saveStats(this.stats);
     const fresh = UNLOCKS.filter((u) => !isUnlocked(u, before) && isUnlocked(u, this.stats));
     if (!fresh.length) return;
+    // A new unlock replaces whatever that weapon had equipped, right away
+    const equipped = loadEquipped();
+    for (const u of fresh) equipped[u.weapon] = u.skin;
+    saveEquipped(equipped);
     this.weapons.refreshSkins(this.stats);
     for (const u of fresh) this.events.emit('unlock', u.label);
   }
 
   // Fossils and kills both feed the layer's points (multiplied by speed/depth when it's cleared)
+  // (the equipped pickaxe's points multiplier applies to everything earned)
   addPoints(points, x, y, color) {
+    points = Math.round(points * this.weapons.pick.points);
     this.layerPoints += points;
     this.fx.floatText(x, y, `+${points}`, color);
   }
@@ -267,6 +282,7 @@ export default class GameScene extends Phaser.Scene {
     const bonus = ENEMY.boss.killBonus;
     this.totalScore += bonus;
     this.healFromScore();
+    this.updateStats((s) => s.bosses++);
     this.fx.floatText(boss.x, boss.body.top - 8, `+${bonus}`, '#ffc83d');
     this.setBossMode(false);
   }

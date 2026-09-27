@@ -206,6 +206,8 @@ export default class PreloadScene extends Phaser.Scene {
     pickaxe('pickaxe_coral', 0xff7f50);
     pickaxe('pickaxe_red', 0xc62828);
     pickaxe('pickaxe_gold', 0xffc83d);
+    pickaxe('pickaxe_blue', 0x42a5f5);
+    pickaxe('pickaxe_mint', 0x98ffcc);
 
     const shotgun = (key, stock, pump) =>
       make(key, 42, 10, (gr) => {
@@ -216,6 +218,7 @@ export default class PreloadScene extends Phaser.Scene {
       });
     shotgun('shotgun', 0x6b3f1f, 0x6b3f1f);
     shotgun('shotgun_gold', 0xd4a017, 0xffc83d);
+    shotgun('shotgun_pink', 0xff69b4, 0xffa6d2);
     make('pellet', 4, 4, (gr) => gr.fillStyle(0xffe082).fillRect(0, 0, 4, 4));
     make('flash', 16, 16, (gr) => gr.fillStyle(0xfff3b0).fillCircle(8, 8, 8));
 
@@ -231,6 +234,11 @@ export default class PreloadScene extends Phaser.Scene {
     circle('fossil_common', 16, 0xffd54f);
     circle('fossil_uncommon', 18, 0xffffff);
     circle('fossil_rare', 22, 0xff5c8a);
+    // The mint-orb easter egg: mint green with brown specks
+    make('fossil_orb', 16, 16, (gr) => {
+      gr.fillStyle(0x98ffcc).fillCircle(8, 8, 8);
+      gr.fillStyle(0x6b3f1f).fillRect(4, 5, 2, 2).fillRect(10, 4, 2, 2).fillRect(7, 10, 2, 2).fillRect(11, 10, 1, 1).fillRect(4, 11, 1, 1);
+    });
     make('clod', 10, 10, (gr) => gr.fillStyle(0x8d6e63).fillCircle(5, 5, 5));
 
     // FX / HUD

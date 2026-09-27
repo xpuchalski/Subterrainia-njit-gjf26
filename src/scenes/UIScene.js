@@ -1,5 +1,5 @@
 import * as Phaser from 'phaser';
-import { PLAYER, SHOTGUN } from '../config.js';
+import { PLAYER } from '../config.js';
 import { formatTime } from '../scoring.js';
 import { sfx } from '../audio.js';
 import { TEXT, blink } from '../ui.js';
@@ -31,11 +31,8 @@ export default class UIScene extends Phaser.Scene {
     // Weapons
     this.pickLabel = this.add.text(12, height - 58, '[1] PICKAXE', { ...FONT, fontSize: '15px' });
     this.gunLabel = this.add.text(12, height - 34, '[2] SHOTGUN', { ...FONT, fontSize: '15px' });
-    this.shellIcons = [];
-    for (let i = 0; i < SHOTGUN.tubeSize; i++) {
-      this.shellIcons.push(this.add.image(136 + i * 12, height - 25, 'shell'));
-    }
-    this.reloadText = this.add.text(136 + SHOTGUN.tubeSize * 12 + 4, height - 34, 'RELOADING', {
+    this.shellIcons = []; // one per shell the equipped shotgun holds (see update)
+    this.reloadText = this.add.text(0, height - 34, 'RELOADING', {
       ...FONT, fontSize: '13px', color: '#ffcc80',
     });
 
@@ -159,10 +156,19 @@ export default class UIScene extends Phaser.Scene {
     this.results.setVisible(true);
   }
 
+  // Shell icons for the equipped shotgun's tube (a skin can change its size mid-run)
+  buildShellIcons(n) {
+    const y = this.scale.height - 25;
+    for (const s of this.shellIcons) s.destroy();
+    this.shellIcons = Array.from({ length: n }, (_, i) => this.add.image(136 + i * 12, y, 'shell'));
+    this.reloadText.setX(136 + n * 12 + 4);
+  }
+
   update() {
     const g = this.gameScene;
     const { hp } = g.player;
-    const { shells, reloading } = g.weapons;
+    const { shells, reloading, tubeSize } = g.weapons;
+    if (this.shellIcons.length !== tubeSize) this.buildShellIcons(tubeSize);
     const gun = g.weapons.current === 'shotgun';
 
     this.hearts.forEach((h, i) => h.setAlpha(i < hp ? 1 : 0.2));

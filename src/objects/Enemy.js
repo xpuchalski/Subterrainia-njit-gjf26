@@ -180,7 +180,7 @@ export default class Enemy extends Phaser.Physics.Arcade.Sprite {
 
     // Hop over walls while chasing
     const blockedAhead = (this.dir < 0 && body.blocked.left) || (this.dir > 0 && body.blocked.right);
-    if (this.state === 'chase' && onGround && blockedAhead) this.setVelocityY(ENEMY.jumpVelocity);
+    if (this.state === 'chase' && onGround && blockedAhead) this.setVelocityY(this.boss ? BOSS.jumpVelocity : ENEMY.jumpVelocity);
   }
 
   // Boss attack loop. Returns true while it's busy (so normal movement is skipped).
@@ -196,8 +196,10 @@ export default class Enemy extends Phaser.Physics.Arcade.Sprite {
       }
       this.attack = 'charge';
       this.attackAt = time + BOSS.chargeMs;
+      this.smashesLeft = BOSS.chargeBreaks;
     }
     if (this.attack === 'charge') {
+      this.smashAhead();
       const b = this.body;
       const hitWall = (this.dir < 0 && b.blocked.left) || (this.dir > 0 && b.blocked.right);
       if (time >= this.attackAt || hitWall) {
@@ -219,6 +221,20 @@ export default class Enemy extends Phaser.Physics.Arcade.Sprite {
     return false;
   }
 
+  // Charging boss: smash blocks directly in front of it (its whole height, never the ground below),
+  // up to BOSS.chargeBreaks per charge
+  smashAhead() {
+    const b = this.body;
+    const x = this.dir > 0 ? b.right + 6 : b.left - 6;
+    for (let y = b.top + 4; y < b.bottom - 4 && this.smashesLeft > 0; y += 16) {
+      const t = this.scene.solidTileAt(x, y);
+      if (t?.floor?.smashTile(t.tx, t.ty)) {
+        this.smashesLeft--;
+        this.scene.cameras.main.shake(80, 0.006);
+      }
+    }
+  }
+
   endAttack(time) {
     this.attack = null;
     this.nextAttackAt = time + BOSS.cooldownMs;
@@ -229,8 +245,7 @@ export default class Enemy extends Phaser.Physics.Arcade.Sprite {
     const scene = this.scene;
     const frontX = this.x + this.dir * (this.body.width / 2 - 10);
     const t = scene.solidTileAt(frontX, this.body.bottom + 4);
-    if (t?.floor) t.floor.breakTile(t.tx, t.ty, false);
-    scene.fx.dust(frontX, this.body.bottom, 0x8d6e63, 20);
+    t?.floor?.smashTile(t.tx, t.ty);
 
     this.throwUntil = scene.time.now + 400;
     const boulder = scene.clods.create(frontX, this.body.top + this.body.height * 0.3, 'clod').setScale(BOSS.boulderScale).setDepth(4);
@@ -243,6 +258,7 @@ export default class Enemy extends Phaser.Physics.Arcade.Sprite {
 
   throwClod(player) {
     this.throwUntil = this.scene.time.now + 250; // front arm swings up (see poseParts)
+    if (this.body.blocked.down) this.setVelocityY(ENEMY.spitterHopVelocity); // hop as it throws
     const clod = this.scene.clods.create(this.x, this.y - 6, 'clod');
     clod.setDepth(4);
     clod.dieAt = this.scene.time.now + 3000;

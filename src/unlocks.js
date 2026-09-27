@@ -1,19 +1,26 @@
-import { STATS_KEY, SKINS_OFF_KEY, UNLOCKS } from './config.js';
+import { STATS_KEY, EQUIPPED_KEY, UNLOCKS, SKIN_STATS } from './config.js';
 import { loadJSON, saveJSON } from './storage.js';
 
-// Lifetime stats: { kills, shells, deepest }, kept across runs
-export const loadStats = () => ({ kills: 0, shells: 0, deepest: 0, ...loadJSON(STATS_KEY, {}) });
+// Lifetime stats, kept across runs
+export const loadStats = () => ({ kills: 0, shells: 0, deepest: 0, bosses: 0, playMs: 0, mintOrb: 0, ...loadJSON(STATS_KEY, {}) });
 export const saveStats = (stats) => saveJSON(STATS_KEY, stats);
 
 export const isUnlocked = (unlock, stats) => stats[unlock.stat] >= unlock.need;
 
-// Skins the player turned off on the menu (a Set of skin keys)
-export const loadSkinsOff = () => new Set(loadJSON(SKINS_OFF_KEY, []));
-export const saveSkinsOff = (off) => saveJSON(SKINS_OFF_KEY, [...off]);
+// The equipped skin per weapon: { pickaxe: skinKey | null, shotgun: ... } (null = plain weapon).
+// A weapon with no saved choice uses its most recently listed earned skin.
+export const loadEquipped = () => loadJSON(EQUIPPED_KEY, {});
+export const saveEquipped = (equipped) => saveJSON(EQUIPPED_KEY, equipped);
 
-// Texture key for a weapon: its best unlocked skin that isn't switched off, or the default
-export function skinFor(weapon, stats, off = loadSkinsOff()) {
-  let key = weapon;
-  for (const u of UNLOCKS) if (u.weapon === weapon && isUnlocked(u, stats) && !off.has(u.skin)) key = u.skin;
-  return key;
+// Texture key for a weapon: the equipped skin if it's earned, else the plain weapon
+export function skinFor(weapon, stats, equipped = loadEquipped()) {
+  const earned = UNLOCKS.filter((u) => u.weapon === weapon && isUnlocked(u, stats));
+  const choice = equipped[weapon];
+  if (choice === undefined) return earned.at(-1)?.skin ?? weapon;
+  return earned.some((u) => u.skin === choice) ? choice : weapon;
+}
+
+// Stat modifiers for a skin (1 / false when it has none)
+export function skinStats(skin) {
+  return { damage: 1, speed: 1, range: 1, points: 1, pellets: 1, shells: 1, fullMag: false, ...SKIN_STATS[skin] };
 }

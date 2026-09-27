@@ -1,6 +1,6 @@
 import * as Phaser from 'phaser';
 import { sfx } from '../audio.js';
-import { TEXT, textButton, quitToMenu } from '../ui.js';
+import { TEXT, textButton, quitToMenu, volumeSliders } from '../ui.js';
 
 // Pause menu over the (paused) game: resume, or quit to the main menu
 export default class PauseScene extends Phaser.Scene {
@@ -26,6 +26,7 @@ export default class PauseScene extends Phaser.Scene {
     textButton(this, width / 2, height / 2, '[ RESUME ]', resume);
     textButton(this, width / 2, height / 2 + 64, '[ MAIN MENU ]', toMenu);
     this.add.text(width / 2, height / 2 + 120, 'Esc / P to resume', { ...TEXT, fontSize: '14px', color: '#888888' }).setOrigin(0.5);
+    volumeSliders(this, width / 2, height / 2 + 160);
 
     this.input.keyboard.once('keydown-ESC', resume);
     this.input.keyboard.once('keydown-P', resume);

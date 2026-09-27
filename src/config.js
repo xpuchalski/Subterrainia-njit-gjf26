@@ -107,6 +107,7 @@ export const FOSSIL_TIERS = {
   common: { hits: 1, points: 10 },
   uncommon: { hits: 2, points: 50 },
   rare: { hits: 4, points: 250 },
+  orb: { hits: 1, points: 0 }, // the mint-orb easter egg (placed by hand, never rolled)
 };
 export const FOSSIL_WEIGHTS_BASE = { common: 70, uncommon: 25, rare: 5 };
 export const FOSSIL_WEIGHTS_PER_FLOOR = { common: -4, uncommon: 2, rare: 1.5 }; // added per floorIndex
@@ -154,7 +155,7 @@ export const ENEMY = {
   },
   noticeRange: 260,
   loseRange: 380,
-  jumpVelocity: -380,
+  jumpVelocity: -440, // clears a 3-tile wall
   contactDamage: 1,
   knockbackX: 200,
   knockbackY: -150,
@@ -163,20 +164,23 @@ export const ENEMY = {
   // Ranged variant ("spitter") shows up from this floor number on
   spitterFromFloor: 5,
   spitterChance: 0.35,
-  spitterRange: 320,
+  spitterRange: 440,
   spitterCooldownMs: 2000,
-  clodSpeed: 320,
+  clodSpeed: 440,
+  spitterHopVelocity: -300, // throwers hop as they throw
   // Points per kill; count toward the layer score like fossils (so they get the speed/depth multipliers)
   killPoints: { melee: 25, spitter: 40 },
   // Rare boss version of either kind. At most one per layer; it gets a cleared arena on the surface.
   boss: {
     chance: 1 / 150, // per enemy spawned
-    guaranteedFloor: 8,
+    guaranteedEvery: 8, // layers 8, 16, 24... always have one
     scale: 5, // x the normal size (hitbox too)
     hpMult: 10,
     killBonus: 15000, // added straight to the total score (not multiplied)
     zoom: 1.5, // camera zooms out to this while a boss is alive on the layer
     contactDamage: 2,
+    jumpVelocity: -500, // clears a 4-tile wall
+    chargeBreaks: 3, // blocks a charge can smash through in front of it (never below)
     knockbackMult: 0.15, // barely budges when hit
     telegraphMs: 1000, // flashes this long before each attack
     attackRange: 420, // starts an attack when the player is this close (and roughly level)
@@ -206,8 +210,10 @@ export const TERRAIN_COLOR = 0x8d6e63;
 export const BACKGROUND_COLOR = 0x1d1f2b;
 
 // --- Audio ---
+// Default volumes; the player's slider settings (title screen / pause menu) are saved over these
 export const MUSIC_VOLUME = 0.5;
 export const SFX_VOLUME = 0.7;
+export const SETTINGS_KEY = 'dont-dig-straight-down.settings';
 // Sound effects in public/assets/sfx. seek = seconds of silent lead-in to skip; volume is relative.
 export const SFX = {
   blockBreak: { file: 'block-break.mp3', volume: 0.25 },
@@ -231,15 +237,33 @@ export const EARLY_CAVES = {
   extraPitWidth: 3, // on layer 1
 };
 
-// Permanent unlocks (progress is cumulative across runs). For the same weapon, later entries win.
+// Permanent unlocks (progress is cumulative across runs). One skin per weapon is equipped at a
+// time (picked on the title screen); earning a new one equips it right away, even mid-run.
 export const STATS_KEY = 'dont-dig-straight-down.stats';
-export const SKINS_OFF_KEY = 'dont-dig-straight-down.skins-off'; // unlocks the player switched off
+export const EQUIPPED_KEY = 'dont-dig-straight-down.equipped';
 export const UNLOCKS = [
-  { stat: 'kills', need: 100, weapon: 'shotgun', skin: 'shotgun_gold', label: 'Gold shotgun', unit: 'kills' },
-  { stat: 'shells', need: 100, weapon: 'pickaxe', skin: 'pickaxe_coral', label: 'Coral pickaxe', unit: 'shells mined' },
-  { stat: 'deepest', need: 10, weapon: 'pickaxe', skin: 'pickaxe_red', label: 'Red pickaxe', unit: 'reach layer' },
-  { stat: 'deepest', need: 15, weapon: 'pickaxe', skin: 'pickaxe_gold', label: 'Gold pickaxe', unit: 'reach layer' },
+  { stat: 'kills', need: 100, weapon: 'shotgun', skin: 'shotgun_gold', label: 'Gold shotgun' },
+  { stat: 'bosses', need: 3, weapon: 'shotgun', skin: 'shotgun_pink', label: 'Pink shotgun' },
+  { stat: 'shells', need: 100, weapon: 'pickaxe', skin: 'pickaxe_coral', label: 'Coral pickaxe' },
+  { stat: 'deepest', need: 10, weapon: 'pickaxe', skin: 'pickaxe_red', label: 'Red pickaxe' },
+  { stat: 'deepest', need: 15, weapon: 'pickaxe', skin: 'pickaxe_gold', label: 'Gold pickaxe' },
+  { stat: 'playMs', need: 60 * 60 * 1000, weapon: 'pickaxe', skin: 'pickaxe_blue', label: 'Blue pickaxe' },
+  { stat: 'mintOrb', need: 1, weapon: 'pickaxe', skin: 'pickaxe_mint', label: 'Mint pickaxe' },
 ];
+// What each skin does. Pickaxe: damage / speed (swing rate) / range multipliers, points = multiplier
+// on all points earned. Shotgun: pellets / shells multipliers, fullMag = one click dumps the tube.
+export const SKIN_STATS = {
+  pickaxe_red: { damage: 1.5 },
+  pickaxe_mint: { range: 1.4 },
+  pickaxe_gold: { speed: 1.6 },
+  pickaxe_coral: { points: 5 },
+  pickaxe_blue: { points: 2, damage: 1.2, speed: 1.2, range: 1.15 },
+  shotgun_gold: { pellets: 3 },
+  shotgun_pink: { shells: 2, fullMag: true },
+};
+export const FULL_MAG_DELAY_MS = 90; // time between shots when a full-mag burst dumps the tube
+// Easter egg: a mint orb buried somewhere on this layer; digging it out unlocks the mint pickaxe
+export const MINT_ORB_LAYER = 10;
 
 export const SCORES_KEY = 'dont-dig-straight-down.scores';
 export const SCORES_KEPT = 10;

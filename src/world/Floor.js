@@ -5,7 +5,7 @@ import {
   STONE_CHANCE_BASE, STONE_CHANCE_PER_FLOOR, STONE_CHANCE_MAX,
   FOSSIL_TIERS, FOSSIL_WEIGHTS_BASE, FOSSIL_WEIGHTS_PER_FLOOR, FOSSIL_WEIGHT_MIN_COMMON,
   SURFACE_FOSSILS, BURIED_FOSSILS, BURIED_FOSSIL_ALPHA, FOSSIL_ART_SCALE, ENEMY,
-  TERRAIN_COLOR, SKELETON_ATTEMPTS, SKELETON_CHANCE, SKELETON_LENGTH, SKELETON_UNCOMMON_BONES,
+  TERRAIN_COLOR, MINT_ORB_LAYER, SKELETON_ATTEMPTS, SKELETON_CHANCE, SKELETON_LENGTH, SKELETON_UNCOMMON_BONES,
 } from '../config.js';
 import Enemy from '../objects/Enemy.js';
 import { sfx } from '../audio.js';
@@ -15,7 +15,6 @@ const AIR = -1;
 const DIRT = 0;
 const STONE = 1;
 const WALL = 2;
-export const WALL_TILE = WALL;
 
 const WALL_TINT = 0x9a9a9a;
 
@@ -43,7 +42,7 @@ export default class Floor {
     if (floorNum >= ENEMY.firstFloor) {
       const floorIndex = floorNum - ENEMY.firstFloor;
       this.enemyCount = Math.min(ENEMY.countMax, ENEMY.countBase + Math.floor(floorIndex / 2) * ENEMY.countPerTwoFloors);
-      this.hasBoss = floorNum === ENEMY.boss.guaranteedFloor ||
+      this.hasBoss = floorNum % ENEMY.boss.guaranteedEvery === 0 ||
         Array.from({ length: this.enemyCount }).some(() => this.rng.frac() < ENEMY.boss.chance);
     }
 
@@ -254,6 +253,10 @@ export default class Floor {
       this.addFossil(c, r, true);
     }
 
+    // Easter egg: the mint orb, buried in one more random spot (no announcement)
+    const orbSpot = buriedSpots[nBuried];
+    if (this.floorNum === MINT_ORB_LAYER && orbSpot) this.addFossil(orbSpot[0], orbSpot[1], true, 'orb');
+
     for (const f of this.fossils) this.refreshExposure(f);
   }
 
@@ -408,6 +411,16 @@ export default class Floor {
     sfx(this.scene, 'pickaxeHit');
   }
 
+  // Break a tile outright (boss charges, boulders) unless it's an unbreakable wall. Returns true if it broke.
+  smashTile(tx, ty) {
+    const tile = this.layer.getTileAt(tx, ty);
+    if (!tile || tile.index === WALL) return false;
+    this.scene.fx.dust(tx * TILE + TILE / 2, this.y + ty * TILE + TILE / 2, TERRAIN_COLOR, 12);
+    sfx(this.scene, 'blockBreak');
+    this.breakTile(tx, ty);
+    return true;
+  }
+
   breakTile(tx, ty) {
     this.layer.removeTileAt(tx, ty);
     this.hp[ty * FLOOR_COLS + tx] = 0;
@@ -451,8 +464,9 @@ export default class Floor {
     f.alive = false;
     if (f.buried) this.buriedAt.delete(key(f.tx, f.ty));
     this.scene.fx.sparkle(f.sprite.x, f.sprite.y);
-    this.scene.addPoints(f.points, f.sprite.x, f.sprite.y - 16, '#fff176');
+    if (f.points) this.scene.addPoints(f.points, f.sprite.x, f.sprite.y - 16, '#fff176');
     if (f.tier === 'common') this.scene.updateStats((s) => s.shells++); // common fossils are the shells
+    if (f.tier === 'orb') this.scene.updateStats((s) => (s.mintOrb = 1));
     this.scene.tweens.add({
       targets: f.sprite, y: f.sprite.y - 30, alpha: 0, scale: f.sprite.scale * 1.6, duration: 300, onComplete: () => f.sprite.destroy(),
     });

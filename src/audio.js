@@ -1,7 +1,21 @@
 import * as Phaser from 'phaser';
-import { MUSIC_VOLUME, SFX_VOLUME, SFX } from './config.js';
+import { MUSIC_VOLUME, SFX_VOLUME, SFX, SETTINGS_KEY } from './config.js';
+import { loadJSON, saveJSON } from './storage.js';
 
 const MUSIC = ['music_menu', 'music_game', 'music_boss'];
+
+// Player volume settings (0-1), saved across sessions
+export const volume = { music: MUSIC_VOLUME, sfx: SFX_VOLUME, ...loadJSON(SETTINGS_KEY, {}) };
+
+// Change a volume ('music' | 'sfx'), save it, and apply it to sounds that are already playing
+export function setVolume(scene, which, v) {
+  volume[which] = v;
+  saveJSON(SETTINGS_KEY, volume);
+  for (const s of scene.sound.sounds) {
+    if (which === 'music' && MUSIC.includes(s.key)) s.setVolume(v);
+    if (which === 'sfx' && s.key.startsWith('sfx_')) s.setVolume(v * (SFX[s.key.slice(4)]?.volume ?? 1));
+  }
+}
 
 // Loop one music track, stopping the others. Calling it for the track that's already
 // playing does nothing, so the game theme carries on across restarts and overlays.
@@ -11,7 +25,7 @@ export function playMusic(scene, key) {
   if (!scene.cache.audio.exists(key)) return; // file missing: stay silent
   const start = () => {
     for (const other of MUSIC) if (other !== key) sound.stopByKey(other);
-    const track = sound.get(key) ?? sound.add(key, { loop: true, volume: MUSIC_VOLUME });
+    const track = sound.get(key) ?? sound.add(key, { loop: true, volume: volume.music });
     if (!track.isPlaying) track.play();
   };
   if (sound.locked) sound.once(Phaser.Sound.Events.UNLOCKED, start);
@@ -22,7 +36,7 @@ export function playMusic(scene, key) {
 function sfxDef(scene, name) {
   const def = SFX[name];
   const key = `sfx_${name}`;
-  return def && scene.cache.audio.exists(key) ? { key, def, volume: SFX_VOLUME * (def.volume ?? 1) } : null;
+  return def && scene.cache.audio.exists(key) ? { key, def, volume: volume.sfx * (def.volume ?? 1) } : null;
 }
 
 // One-shot sound effect by SFX key (config.js). Slight random pitch keeps repeats from sounding

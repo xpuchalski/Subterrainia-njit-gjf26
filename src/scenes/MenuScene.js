@@ -1,7 +1,7 @@
 import * as Phaser from 'phaser';
 import { UNLOCKS } from '../config.js';
 import { loadScores } from '../scoring.js';
-import { loadStats, isUnlocked, loadSkinsOff, saveSkinsOff } from '../unlocks.js';
+import { loadStats, isUnlocked, loadEquipped, saveEquipped, skinFor } from '../unlocks.js';
 import { playMusic, sfx } from '../audio.js';
 import { TEXT, blink } from '../ui.js';
 
@@ -33,26 +33,30 @@ export default class MenuScene extends Phaser.Scene {
       : ['no runs yet'];
     this.add.text(cx, 102, rows.join('\n'), { ...TEXT, fontSize: '15px', lineSpacing: 5, color: '#dddddd' }).setOrigin(0.5, 0);
 
-    // Earned unlocks only (locked ones stay secret). Click one to switch it on/off.
+    // Earned skins only (locked ones stay secret). One per weapon: click to equip it (or the plain weapon).
     const stats = loadStats();
     const earned = UNLOCKS.filter((u) => isUnlocked(u, stats));
     if (earned.length) {
-      const off = loadSkinsOff();
-      this.add.text(cx, 300, 'UNLOCKS  (click to toggle)', { ...TEXT, fontSize: '18px', fontStyle: 'bold', color: '#d4a017' }).setOrigin(0.5);
-      earned.forEach((u, i) => {
-        const row = this.add.text(cx, 326 + i * 24, '', { ...TEXT, fontSize: '15px' }).setOrigin(0.5, 0);
+      const equipped = loadEquipped();
+      this.add.text(cx, 300, 'EQUIPPED  (click to choose)', { ...TEXT, fontSize: '18px', fontStyle: 'bold', color: '#d4a017' }).setOrigin(0.5);
+      [['shotgun', 'Shotgun', cx - 130], ['pickaxe', 'Pickaxe', cx + 130]].forEach(([weapon, plain, x]) => {
+        const options = [{ skin: weapon, label: plain }, ...earned.filter((u) => u.weapon === weapon)];
+        const rows = options.map((o, i) =>
+          this.add.text(x, 322 + i * 20, '', { ...TEXT, fontSize: '14px' }).setOrigin(0.5, 0).setInteractive({ useHandCursor: true }));
         const render = () => {
-          const on = !off.has(u.skin);
-          row.setText(`${on ? '[ON] ' : '[OFF]'} ${u.label}`).setColor(on ? '#ffc83d' : '#777777');
+          const current = skinFor(weapon, stats, equipped);
+          options.forEach((o, i) => {
+            const on = o.skin === current;
+            rows[i].setText(on ? `> ${o.label} <` : o.label).setColor(on ? '#ffc83d' : '#888888');
+          });
         };
-        render();
-        row.setInteractive({ useHandCursor: true }).on('pointerdown', () => {
-          if (off.has(u.skin)) off.delete(u.skin);
-          else off.add(u.skin);
-          saveSkinsOff(off);
+        options.forEach((o, i) => rows[i].on('pointerdown', () => {
+          equipped[weapon] = o.skin === weapon ? null : o.skin;
+          saveEquipped(equipped);
           sfx(this, 'click');
           render();
-        });
+        }));
+        render();
       });
     }
 

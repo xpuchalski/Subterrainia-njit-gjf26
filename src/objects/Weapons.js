@@ -1,6 +1,6 @@
 import * as Phaser from 'phaser';
-import { PICKAXE, SHOTGUN, PLAYER_ART, PUMP_AFTER_SHOT_MS } from '../config.js';
-import { skinFor } from '../unlocks.js';
+import { PICKAXE, SHOTGUN, PLAYER_ART, PUMP_AFTER_SHOT_MS, FULL_MAG_DELAY_MS } from '../config.js';
+import { skinFor, skinStats } from '../unlocks.js';
 import { sfx } from '../audio.js';
 
 const WEAPONS = ['pickaxe', 'shotgun'];
@@ -30,7 +30,8 @@ export default class Weapons {
     this.swingTween = null;
 
     // Shotgun
-    this.shells = SHOTGUN.tubeSize;
+    this.shells = this.tubeSize; // (set by refreshSkins)
+    this.burst = false; // full-mag skin: keep firing until the tube is empty
     this.nextShotAt = 0;
     this.lastShotAt = 0;
     this.slamActive = false;
@@ -51,10 +52,14 @@ export default class Weapons {
     scene.input.on('pointerup', () => (this.slamActive = false));
   }
 
-  // Pick each weapon's texture from the unlocks earned so far (called again when one unlocks)
+  // Equipped skin per weapon and what it does (called again when something unlocks mid-run)
   refreshSkins(stats) {
     for (const w of WEAPONS) this.skins[w] = skinFor(w, stats);
     this.sprite.setTexture(this.skins[this.current]);
+    this.pick = skinStats(this.skins.pickaxe); // damage / speed / range / points
+    this.gun = skinStats(this.skins.shotgun); // pellets / shells / fullMag
+    this.tubeSize = SHOTGUN.tubeSize * this.gun.shells;
+    if (this.shells > this.tubeSize) this.shells = this.tubeSize;
   }
 
   get reloading() {
@@ -73,6 +78,7 @@ export default class Weapons {
     this.slashGfx?.destroy();
     this.swingOffset = 0;
     this.slamActive = false;
+    this.burst = false;
     this.current = name;
     this.sprite.setTexture(this.skins[name]).setOrigin(...ORIGINS[name]);
     this.setArm(ARMS[name]);
@@ -136,9 +142,14 @@ export default class Weapons {
     if (this.waitForRelease && !pointer.isDown) this.waitForRelease = false;
     if (this.player.alive && pointer.leftButtonDown() && !this.waitForRelease) {
       if (this.current === 'pickaxe' && time >= this.nextSwingAt) this.swing(time); // click or hold to dig
-      if (this.current === 'shotgun' && this.slamActive && time >= this.lastShotAt + SHOTGUN.slamDelayMs) {
+      if (this.current === 'shotgun' && this.slamActive && !this.burst && time >= this.lastShotAt + SHOTGUN.slamDelayMs) {
         this.fire(time, true);
       }
+    }
+    // Full-mag burst keeps going on its own until the tube is empty
+    if (this.burst) {
+      if (this.shells <= 0 || this.current !== 'shotgun' || !this.player.alive) this.burst = false;
+      else if (time >= this.lastShotAt + FULL_MAG_DELAY_MS) this.fire(time, false);
     }
 
     // Pellet lifetime + terrain stops them
@@ -161,21 +172,24 @@ export default class Weapons {
     }
     if (time >= this.nextShotAt) {
       this.fire(time, false);
-      this.slamActive = true;
+      if (this.gun.fullMag) this.burst = true;
+      else this.slamActive = true;
     }
   }
 
   // ------------------------------------------------------------ pickaxe
 
   swing(time) {
-    this.nextSwingAt = time + PICKAXE.cooldownMs;
+    const mod = this.pick;
+    this.nextSwingAt = time + PICKAXE.cooldownMs / mod.speed;
+    const radius = PICKAXE.slashRadius * mod.range;
     const { x, y } = this.player.shoulder();
     const angle = this.aimAngle;
     this.animateSwing();
 
     const inSlash = (px, py) => {
       const d = Phaser.Math.Distance.Between(x, y, px, py);
-      if (d > PICKAXE.slashRadius) return false;
+      if (d > radius) return false;
       if (d < 14) return true;
       const diff = Math.abs(Phaser.Math.Angle.Wrap(Math.atan2(py - y, px - x) - angle));
       return diff <= Phaser.Math.DegToRad(PICKAXE.slashArcDeg);
@@ -189,7 +203,7 @@ export default class Weapons {
       const cx = Phaser.Math.Clamp(x, b.left, b.right);
       const cy = Phaser.Math.Clamp(y, b.top, b.bottom);
       if (inSlash(cx, cy) || inSlash(e.x, e.y)) {
-        e.hit(PICKAXE.enemyDamage, x, PICKAXE.enemyKnockbackX);
+        e.hit(PICKAXE.enemyDamage * mod.damage, x, PICKAXE.enemyKnockbackX);
         hitFromX ??= e.x;
       }
     }
@@ -207,13 +221,19 @@ export default class Weapons {
     }
     if (connected) sfx(this.scene, 'pickaxeHit'); // terrain hits play their own sound
 
-    this.scene.pickaxeTerrain(angle);
+    this.scene.pickaxeTerrain(angle, {
+      damage: Math.round(PICKAXE.tileDamage * mod.damage),
+      reach: PICKAXE.reach * mod.range,
+      extraTiles: PICKAXE.extraTiles + (mod.range >= 1.3 ? 1 : 0),
+    });
   }
 
   // The pickaxe sweeps across the slash arc, and the slash is drawn trailing right behind it
   animateSwing() {
     const arc = Phaser.Math.DegToRad(PICKAXE.slashArcDeg);
-    const R = PICKAXE.slashRadius;
+    const R = PICKAXE.slashRadius * this.pick.range;
+    const swingMs = PICKAXE.swingMs / this.pick.speed;
+    const cooldownMs = PICKAXE.cooldownMs / this.pick.speed;
     const scene = this.scene;
     const aim = this.aimAngle;
     const left = Math.abs(aim) > Math.PI / 2;
@@ -239,14 +259,14 @@ export default class Weapons {
 
     this.swingOffset = -arc;
     this.swingTween = scene.tweens.add({
-      targets: this, swingOffset: arc, duration: PICKAXE.swingMs, ease: 'Sine.easeOut',
+      targets: this, swingOffset: arc, duration: swingMs, ease: 'Sine.easeOut',
       onUpdate: draw,
       onComplete: () => {
         draw();
         scene.tweens.add({ targets: g, alpha: 0, duration: PICKAXE.slashFadeMs, onComplete: () => g.destroy() });
         // Ease the pickaxe back to rest over the rest of the cooldown
         this.swingTween = scene.tweens.add({
-          targets: this, swingOffset: 0, duration: PICKAXE.cooldownMs - PICKAXE.swingMs, ease: 'Quad.easeInOut',
+          targets: this, swingOffset: 0, duration: cooldownMs - swingMs, ease: 'Quad.easeInOut',
         });
       },
     });
@@ -272,8 +292,9 @@ export default class Weapons {
     // Muzzle jammed into terrain: the blast is absorbed
     const blocked = this.scene.isSolidAt(muzzleX, muzzleY);
     if (blocked) this.scene.fx.sparks(muzzleX, muzzleY);
-    for (let i = 0; i < SHOTGUN.pellets && !blocked; i++) {
-      const t = SHOTGUN.pellets === 1 ? 0.5 : i / (SHOTGUN.pellets - 1);
+    const pellets = Math.round(SHOTGUN.pellets * this.gun.pellets);
+    for (let i = 0; i < pellets && !blocked; i++) {
+      const t = pellets === 1 ? 0.5 : i / (pellets - 1);
       const a = angle + (t - 0.5) * spread + Phaser.Math.FloatBetween(-0.04, 0.04);
       const speed = SHOTGUN.pelletSpeed * Phaser.Math.FloatBetween(0.9, 1.1);
       const pellet = this.pellets.create(muzzleX, muzzleY, 'pellet');
@@ -291,14 +312,14 @@ export default class Weapons {
   }
 
   startReload() {
-    if (this.current !== 'shotgun' || this.reloading || this.shells >= SHOTGUN.tubeSize || !this.player.alive) return;
+    if (this.current !== 'shotgun' || this.reloading || this.shells >= this.tubeSize || !this.player.alive) return;
     this.slamActive = false;
     this.reloadEvent = this.scene.time.addEvent({
       delay: SHOTGUN.reloadPerShellMs,
       loop: true,
       callback: () => {
         this.shells++;
-        if (this.shells >= SHOTGUN.tubeSize) {
+        if (this.shells >= this.tubeSize) {
           this.cancelReload();
           sfx(this.scene, 'shotgunPump'); // chamber a round once the tube is full
         }
