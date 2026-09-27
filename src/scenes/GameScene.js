@@ -96,7 +96,10 @@ export default class GameScene extends Phaser.Scene {
   }
 
   // Clods just break; a boss boulder also smashes the tile it hit and the next one along its path
+  // Phaser calls this once per tile touched in a step, so a clod that already broke up on the
+  // first tile gets called again with no body: ignore those.
   clodHitsTerrain(clod, floor, tile) {
+    if (!clod.active) return;
     if (clod.big) {
       const along = Math.sign(clod.body.velocity.x) || 1;
       const targets = [[tile.x, tile.y], [tile.x + along, tile.y]].slice(0, ENEMY.boss.boulderBreaks);

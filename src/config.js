@@ -245,10 +245,10 @@ export const STATS_KEY = 'dont-dig-straight-down.stats';
 export const EQUIPPED_KEY = 'dont-dig-straight-down.equipped';
 export const UNLOCKS = [
   { stat: 'kills', need: 100, weapon: 'shotgun', skin: 'shotgun_gold', label: 'Gold shotgun' },
-  { stat: 'bosses', need: 3, weapon: 'shotgun', skin: 'shotgun_pink', label: 'Pink shotgun' },
+  { stat: 'bosses', need: 10, weapon: 'shotgun', skin: 'shotgun_pink', label: 'Pink shotgun' },
   { stat: 'shells', need: 100, weapon: 'pickaxe', skin: 'pickaxe_coral', label: 'Coral pickaxe' },
-  { stat: 'deepest', need: 10, weapon: 'pickaxe', skin: 'pickaxe_red', label: 'Red pickaxe' },
-  { stat: 'deepest', need: 15, weapon: 'pickaxe', skin: 'pickaxe_gold', label: 'Gold pickaxe' },
+  { stat: 'deepest', need: 15, weapon: 'pickaxe', skin: 'pickaxe_red', label: 'Red pickaxe' },
+  { stat: 'deepest', need: 25, weapon: 'pickaxe', skin: 'pickaxe_gold', label: 'Gold pickaxe' },
   { stat: 'playMs', need: 60 * 60 * 1000, weapon: 'pickaxe', skin: 'pickaxe_blue', label: 'Blue pickaxe' },
   { stat: 'mintOrb', need: 1, weapon: 'pickaxe', skin: 'pickaxe_mint', label: 'Mint pickaxe' },
 ];
