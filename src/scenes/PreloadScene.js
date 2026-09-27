@@ -1,6 +1,5 @@
 import * as Phaser from 'phaser';
 import { TILE, ENEMY, PLAYER_ART, SFX } from '../config.js';
-import { TEXT, blink } from '../ui.js';
 
 // Loads all game assets and shows a progress bar.
 export default class PreloadScene extends Phaser.Scene {
@@ -34,24 +33,9 @@ export default class PreloadScene extends Phaser.Scene {
     this.buildPlayerTextures();
     this.buildFossilTextures();
     this.makePlaceholderTextures();
-
-    // Browsers block audio until the first click/key press. If it's still blocked, ask for a
-    // click here so the menu theme can start as soon as the menu appears.
-    if (!this.sound.locked) {
-      this.scene.start('Menu');
-      return;
-    }
-    this.children.removeAll(true); // clear the loading bar
-    const { width, height } = this.scale;
-    blink(this, this.add.text(width / 2, height / 2, 'Click anywhere to begin', { ...TEXT, fontSize: '24px', color: '#dddddd' }).setOrigin(0.5));
-    let started = false;
-    const go = () => {
-      if (started) return;
-      started = true;
-      this.scene.start('Menu');
-    };
-    this.input.once('pointerdown', go);
-    this.input.keyboard.once('keydown', go);
+    // Straight to the menu. (Browsers block audio until the first click/key press; the menu
+    // theme waits for that and then starts on its own, see playMusic.)
+    this.scene.start('Menu');
   }
 
   // Pixels of a loaded image cropped to its non-transparent area: { w, h, px (RGBA array) }
